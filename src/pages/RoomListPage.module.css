@@ -1,0 +1,147 @@
+.page {
+    display: flex;
+    flex-direction: column;
+    height: 100dvh;
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 1rem;
+    gap: 1rem;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.header h1 {
+    font-size: 1.4rem;
+}
+
+.settingsBtn {
+    background: none;
+    border: none;
+    font-size: 1.4rem;
+    color: #ccc;
+}
+
+.error {
+    background: #3a1010;
+    border: 1px solid #ff6b6b;
+    border-radius: 6px;
+    padding: 0.6rem 0.8rem;
+    color: #ff6b6b;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.9rem;
+}
+
+.error button {
+    background: none;
+    border: none;
+    color: #ff6b6b;
+    font-size: 1rem;
+}
+
+.newRow {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.newRow input {
+    flex: 1;
+    background: #16213e;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 0.6rem 0.8rem;
+    color: #e0e0e0;
+    font-size: 1rem;
+    outline: none;
+}
+
+.newRow input:focus {
+    border-color: #5e8aff;
+}
+
+.newRow button {
+    background: #5e8aff;
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 0 1rem;
+    font-size: 1.4rem;
+    font-weight: 600;
+}
+
+.loading {
+    color: #aaa;
+    text-align: center;
+    padding: 2rem;
+}
+
+.list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    overflow-y: auto;
+}
+
+.item {
+    background: #16213e;
+    border-radius: 8px;
+    padding: 0.8rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.name {
+    flex: 1;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.name:hover {
+    color: #5e8aff;
+}
+
+.actions {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.actions button {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    color: #aaa;
+}
+
+.actions button:hover {
+    color: #e0e0e0;
+}
+
+.editRow {
+    display: flex;
+    gap: 0.5rem;
+    flex: 1;
+}
+
+.editRow input {
+    flex: 1;
+    background: #0f3460;
+    border: 1px solid #5e8aff;
+    border-radius: 4px;
+    padding: 0.3rem 0.6rem;
+    color: #e0e0e0;
+    outline: none;
+}
+
+.editRow button {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 1rem;
+}

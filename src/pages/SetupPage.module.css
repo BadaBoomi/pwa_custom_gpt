@@ -1,0 +1,63 @@
+.page {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+}
+
+h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.hint {
+    color: #aaa;
+    font-size: 0.9rem;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+}
+
+.field label {
+    font-size: 0.85rem;
+    color: #ccc;
+}
+
+.field input {
+    background: #16213e;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 0.6rem 0.8rem;
+    color: #e0e0e0;
+    font-size: 1rem;
+    outline: none;
+}
+
+.field input:focus {
+    border-color: #5e8aff;
+}
+
+.error {
+    font-size: 0.8rem;
+    color: #ff6b6b;
+}
+
+.saveBtn {
+    background: #5e8aff;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.8rem;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: background 0.2s;
+}
+
+.saveBtn:hover {
+    background: #4070e0;
+}
