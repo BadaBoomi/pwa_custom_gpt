@@ -9,6 +9,7 @@ pwa_custom_gpt ist die lokale, offline-fähige PWA-Neuimplementierung von a_cust
 - Unterstützung für mehrere Räume
 - Verwaltung von Konversationen und Nachrichten
 - Setup und Einstellungen für API-Key, Prompt-ID, Vector-Store-IDs und Benutzer-E-Mail
+- Read-only Konfigurationsansicht mit Reload über API
 - Local-first Persistenz mit IndexedDB
 - Offline-fähige App-Shell als PWA
 - Trennung von lokaler Persistenz und OpenAI-API-Zugriff
@@ -64,7 +65,7 @@ Die App trennt lokale App-Daten klar von den Daten für den OpenAI-Zugriff.
 ### 1. Direkte API-Key & Prompt-ID
 Die primäre Konfiguration erfolgt über:
 - **API-Key**: OpenAI API-Key für die Authentifizierung bei der OpenAI API
-- **PROMPT-ID**: Die ID des konfigurierten OpenAI Prompts
+- **PROMPT-ID**: Die globale Prompt-ID für Konfigurationsanfragen (`GET_CONFIGURATION`)
 - **VECTORS-TORE-IDS**: Komma-getrennte Liste von OpenAI Vector-Stores
 - **User-E-Mail**: Optionaler Benutzerwert, der in den Request-Headern mitgegeben wird
 
@@ -81,22 +82,28 @@ Starters sind vordefinierte Prompt-Vorschläge, die in Konversationen schnell ve
 
 **Beispiel starters.md:**
 ```markdown
-| Zweck | Prompt |
-|-------|--------|
-| Frage nach einer berühmten Persönlichkeit | Wer war eigentlich |
-| Rechenaufgabe | Wieviel ist |
-| Humor | Erzähle einen Witz über |
-| Codierung | Schreib einen Python-Code für |
-| Zusammenfassung | Fasse zusammen: |
+| Zweck | Prompt | Prompt-ID |
+|-------|--------|-----------|
+| Frage nach einer berühmten Persönlichkeit | Wer war eigentlich | pmpt_... |
+| Rechenaufgabe | Wieviel ist | pmpt_... |
+| Humor | Erzähle einen Witz über | pmpt_... |
+| Codierung | Schreib einen Python-Code für | pmpt_... |
+| Zusammenfassung | Fasse zusammen: | pmpt_... |
 ```
 
 ### Spalten:
 - **Zweck**: Kurze Beschreibung des Starters, wird in der UI angezeigt
 - **Prompt**: Der eigentliche Prompt-Text, der in das Eingabefeld übernommen wird
+- **Prompt-ID**: Prompt-Ziel für Dialoganfragen bei gewähltem Zweck
 
 ### Verwendung in der App
 
 Nach dem Speichern der Konfiguration werden die Starters lokal geladen und in jeder Konversation als auswählbare Vorschläge angezeigt.
+
+Zusätzlich bietet die Einstellungsseite:
+- eine read-only Tabelle mit den aktuellen Konfigurationsdaten
+- einen Button **Konfigurationsdaten neu lesen**, der `GET_CONFIGURATION` über die API auslöst
+- Parsing von Antworten sowohl als Markdown-Tabelle als auch als JSON im `output_text` (inklusive ` ```json `-Codeblock)
 
 ## Nutzung
 
@@ -108,9 +115,17 @@ Nach dem Speichern der Konfiguration werden die Starters lokal geladen und in je
 ### Arbeitsablauf
 1. **Räume verwalten**: Neue Räume erstellen oder vorhandene auswählen
 2. **Chats erstellen**: Innerhalb eines Raumes neue Chats für verschiedene Themen anlegen
-3. **Mit Starters arbeiten**: In der Konversation auf Starter-Vorschläge klicken, um den Prompt einzufügen
-4. **Konversieren**: Prompts bearbeiten und Nachrichten an den Assistenten senden
-5. **Offline nutzen**: App-Shell und lokale Daten bleiben ohne Backend auf dem Gerät verfügbar
+3. **Zweck wählen**: In der Konversation muss zuerst ein Label aus **Zweck** gewählt werden
+4. **Mit Starters arbeiten**: Die Auswahl setzt den Eingabetext auf den Wert aus **Prompt**
+5. **Konversieren**: Nachrichten werden mit der **Prompt-ID** des aktuell gewählten Labels gesendet
+6. **Label wechseln**: Bei Auswahl eines anderen Labels wechselt die verwendete Prompt-ID sofort
+7. **Offline nutzen**: App-Shell und lokale Daten bleiben ohne Backend auf dem Gerät verfügbar
+
+### Regeln für Prompt-Routing
+
+- Ohne Label-Auswahl ist kein Senden möglich.
+- Für Dialoge gilt ausschließlich die Prompt-ID aus dem ausgewählten Label.
+- Die globale Prompt-ID wird nur für Konfigurationsanfragen verwendet, nicht für normale Dialognachrichten.
 
 ### Schnelltest
 
@@ -132,7 +147,8 @@ Die App ist bewusst local-first ausgelegt. Wichtige Daten werden im Browser gesp
 | Bereich | Speicher | Beschreibung |
 |---|---|---|
 | Räume, Chats, Nachrichten | IndexedDB | Persistente App-Daten |
-| Einstellungen | localStorage | API-Key, Prompt-ID, Vector-Store-IDs, E-Mail |
+| Einstellungen | localStorage | API-Key, globale Prompt-ID, Vector-Store-IDs, E-Mail |
+| Konfigurationsauswahl pro Chat | localStorage | Gewähltes Zweck-Label inkl. Prompt/Prompt-ID |
 | App-Shell | Service Worker / PWA Cache | Offline-Bereitstellung statischer Assets |
 
 **Hinweise:**
