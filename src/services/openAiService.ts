@@ -101,6 +101,25 @@ export const openAiService = {
             body: JSON.stringify(request),
         })
     },
+
+    // Liest Konfigurationsdaten (z. B. starters.md) über den Assistant-Flow neu ein.
+    readConfiguration(promptId: string, vectorStoreIds: string[], userEmail: string): Promise<ResponseApiResult> {
+        const tools =
+            vectorStoreIds.length > 0
+                ? [{ type: 'file_search', vector_store_ids: vectorStoreIds }]
+                : undefined
+
+        const content = `[user-id: ${userEmail}] GET_CONFIGURATION`
+
+        return apiFetch<ResponseApiResult>('/responses', {
+            method: 'POST',
+            body: JSON.stringify({
+                prompt: { id: promptId },
+                input: [{ role: 'user', content }],
+                tools,
+            } satisfies CreateResponseRequest),
+        })
+    },
 }
 
 export { getTextContent }

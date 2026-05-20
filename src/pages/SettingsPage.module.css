@@ -73,3 +73,90 @@
     font-size: 0.9rem;
     text-align: center;
 }
+
+.configSection {
+    border-top: 1px solid #2a2a2a;
+    padding-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.configHeader {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.7rem;
+}
+
+.configHeader h2 {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #e7e7e7;
+}
+
+.refreshBtn {
+    background: #222f5a;
+    color: #dce7ff;
+    border: 1px solid #3554aa;
+    border-radius: 8px;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.85rem;
+}
+
+.refreshBtn:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
+.configError {
+    color: #ff8f8f;
+    font-size: 0.85rem;
+}
+
+.emptyConfig {
+    color: #b6b6b6;
+    font-size: 0.9rem;
+}
+
+.tableWrap {
+    width: 100%;
+    overflow-x: auto;
+    border: 1px solid #2f2f3d;
+    border-radius: 10px;
+}
+
+.configTable {
+    width: 100%;
+    border-collapse: collapse;
+    min-width: 420px;
+}
+
+.configTable th,
+.configTable td {
+    text-align: left;
+    padding: 0.55rem 0.7rem;
+    border-bottom: 1px solid #2f2f3d;
+    vertical-align: top;
+}
+
+.configTable th {
+    background: #171b2a;
+    font-size: 0.82rem;
+    color: #cfd8f3;
+    letter-spacing: 0.02em;
+}
+
+.configTable td {
+    font-size: 0.9rem;
+    color: #ececec;
+}
+
+.configTable tr:last-child td {
+    border-bottom: none;
+}
+
+.readOnlyHint {
+    color: #9aa4c5;
+    font-size: 0.8rem;
+}
