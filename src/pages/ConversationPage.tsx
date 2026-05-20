@@ -7,15 +7,27 @@ import styles from './ConversationPage.module.css'
 export default function ConversationPage() {
     const { chatId } = useParams<{ chatId: string }>()
     const navigate = useNavigate()
-    const { chat, roomName, messages, inputText, isLoading, error, onInputChange, sendMessage, getStarterPrompts, clearError } =
+    const {
+        chat,
+        roomName,
+        messages,
+        inputText,
+        configurationEntries,
+        selectedConfiguration,
+        isLoading,
+        error,
+        onInputChange,
+        selectConfigurationEntry,
+        sendMessage,
+        requiresConfigurationSelection,
+        clearError,
+    } =
         useConversation(chatId!)
     const bottomRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
         bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
     }, [messages])
-
-    const starters = getStarterPrompts()
 
     return (
         <div className={styles.page}>
@@ -37,22 +49,6 @@ export default function ConversationPage() {
             )}
 
             <div className={styles.messages}>
-                {messages.length === 0 && !isLoading && starters.length > 0 && (
-                    <div className={styles.starters}>
-                        {starters.map((s) => (
-                            <button
-                                key={s.label}
-                                className={styles.starterChip}
-                                onClick={() => {
-                                    onInputChange(s.prompt)
-                                }}
-                            >
-                                {s.label}
-                            </button>
-                        ))}
-                    </div>
-                )}
-
                 {messages.map((msg) => (
                     <div
                         key={msg.id}
@@ -70,6 +66,35 @@ export default function ConversationPage() {
                 <div ref={bottomRef} />
             </div>
 
+            <div className={styles.configSelector}>
+                <div className={styles.configHeaderLine}>
+                    <span className={styles.configTitle}>Was möchten Sie tun?</span>
+                    {selectedConfiguration && (
+                        <span className={styles.selectedInfo}>Aktiv: {selectedConfiguration.label}</span>
+                    )}
+                </div>
+
+                <div className={styles.starters}>
+                    {configurationEntries.map((entry) => (
+                        <button
+                            key={`${entry.label}-${entry.promptId ?? 'none'}`}
+                            className={`${styles.starterChip} ${selectedConfiguration?.label === entry.label && selectedConfiguration?.promptId === entry.promptId ? styles.starterChipActive : ''}`}
+                            onClick={() => {
+                                selectConfigurationEntry(entry)
+                            }}
+                        >
+                            {entry.label}
+                        </button>
+                    ))}
+                </div>
+
+                {requiresConfigurationSelection && (
+                    <p className={styles.selectionHint}>
+                        Vor dem Senden muss ein Zweck ausgewaehlt werden. Die aktive Auswahl steuert die verwendete Prompt-ID.
+                    </p>
+                )}
+            </div>
+
             <div className={styles.inputRow}>
                 <textarea
                     value={inputText}
@@ -84,7 +109,10 @@ export default function ConversationPage() {
                     rows={1}
                     disabled={isLoading}
                 />
-                <button onClick={() => void sendMessage()} disabled={isLoading || !inputText.trim()}>
+                <button
+                    onClick={() => void sendMessage()}
+                    disabled={isLoading || !inputText.trim() || requiresConfigurationSelection}
+                >
                     ➤
                 </button>
             </div>

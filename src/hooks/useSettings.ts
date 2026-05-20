@@ -41,9 +41,9 @@ function initialState(): SettingsState {
 }
 
 function rowsToStartersMarkdown(rows: ConfigurationPrompt[]): string {
-    const header = '| Zweck | Prompt |'
-    const separator = '|---|---|'
-    const body = rows.map((row) => `| ${row.label} | ${row.prompt} |`)
+    const header = '| Zweck | Prompt | Prompt-ID |'
+    const separator = '|---|---|---|'
+    const body = rows.map((row) => `| ${row.label} | ${row.prompt} | ${row.promptId ?? ''} |`)
     return [header, separator, ...body].join('\n')
 }
 
@@ -92,7 +92,11 @@ function parseConfigurationPrompts(rawText: string): ConfigurationPrompt[] {
     }
 
     // 3) Fallback: bestehende Markdown-Tabellenlogik
-    return parseStarterPrompts(rawText).map((row) => ({ label: row.label, prompt: row.prompt }))
+    return parseStarterPrompts(rawText).map((row) => ({
+        label: row.label,
+        prompt: row.prompt,
+        promptId: row.promptId,
+    }))
 }
 
 export function useSettings() {

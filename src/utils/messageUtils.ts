@@ -71,13 +71,19 @@ function extractLeadingJsonObject(text: string): [string, string] | null {
  * |--|--|
  * |Label|Prompt text|
  */
-export function parseStarterPrompts(startersMd: string): Array<{ label: string; prompt: string }> {
+export function parseStarterPrompts(startersMd: string): Array<{ label: string; prompt: string; promptId?: string }> {
     return startersMd
         .split('\n')
         .slice(2) // Header-Zeile + Trennzeile überspringen
         .flatMap((line) => {
             const cols = line.split('|').map((s) => s.trim()).filter(Boolean)
-            if (cols.length >= 2) return [{ label: cols[0], prompt: cols[1] }]
+            if (cols.length >= 2) {
+                return [{
+                    label: cols[0],
+                    prompt: cols[1],
+                    promptId: cols[2] || undefined,
+                }]
+            }
             return []
         })
 }

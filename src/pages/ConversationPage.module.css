@@ -67,7 +67,35 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    margin-bottom: 1rem;
+}
+
+.configSelector {
+    border-top: 1px solid #222;
+    padding: 0.7rem 1rem 0.6rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.configHeaderLine {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+}
+
+.configTitle {
+    color: #cfd8f3;
+    font-size: 0.82rem;
+    letter-spacing: 0.02em;
+}
+
+.selectedInfo {
+    color: #99b4ff;
+    font-size: 0.78rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .starterChip {
@@ -83,6 +111,17 @@
 .starterChip:hover {
     border-color: #5e8aff;
     color: #fff;
+}
+
+.starterChipActive {
+    border-color: #5e8aff;
+    background: #1f315f;
+    color: #eef3ff;
+}
+
+.selectionHint {
+    color: #ffb37f;
+    font-size: 0.8rem;
 }
 
 .bubble {
