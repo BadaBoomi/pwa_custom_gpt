@@ -54,6 +54,30 @@
     color: #ff6b6b;
 }
 
+.flowBanner {
+    background: #12243a;
+    border-bottom: 1px solid #2f4f77;
+    padding: 0.5rem 1rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 0.7rem;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.flowTitle {
+    color: #d8e7ff;
+    font-size: 0.82rem;
+    font-weight: 600;
+}
+
+.flowMeta {
+    color: #95b5e7;
+    font-size: 0.78rem;
+    text-transform: capitalize;
+    white-space: nowrap;
+}
+
 .messages {
     flex: 1;
     overflow-y: auto;

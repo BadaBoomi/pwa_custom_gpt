@@ -11,12 +11,22 @@ interface ConfigurationEntry {
     promptId?: string
 }
 
+interface ActiveFlow {
+    flowId: string
+    flowType: string
+    status: string
+    currentStep: string
+    stepLabel: string
+    updatedAt: number
+}
+
 const SELECTED_CONFIG_STORAGE_PREFIX = 'selected_config_'
 
 interface ConversationState {
     chat: Chat | null
     roomName: string
     messages: Message[]
+    activeFlow: ActiveFlow | null
     inputText: string
     configurationEntries: ConfigurationEntry[]
     selectedConfiguration: ConfigurationEntry | null
@@ -29,6 +39,7 @@ export function useConversation(chatId: string) {
         chat: null,
         roomName: '',
         messages: [],
+        activeFlow: null,
         inputText: '',
         configurationEntries: [],
         selectedConfiguration: null,
@@ -41,6 +52,11 @@ export function useConversation(chatId: string) {
         setState((s) => ({ ...s, messages }))
     }, [chatId])
 
+    const loadActiveFlow = useCallback(async () => {
+        const activeFlow = await chatRepository.getActiveFlowForChat(chatId)
+        setState((s) => ({ ...s, activeFlow }))
+    }, [chatId])
+
     useEffect(() => {
         const init = async () => {
             try {
@@ -51,6 +67,7 @@ export function useConversation(chatId: string) {
                     roomName = rooms.find((r) => r.id === chat.roomId)?.name ?? ''
                 }
                 const messages = await chatRepository.getMessagesForChat(chatId)
+                const activeFlow = await chatRepository.getActiveFlowForChat(chatId)
                 const configurationEntries = parseStarterPrompts(settingsRepository.getStarters() ?? '')
 
                 const persisted = localStorage.getItem(`${SELECTED_CONFIG_STORAGE_PREFIX}${chatId}`)
@@ -74,6 +91,7 @@ export function useConversation(chatId: string) {
                     chat: chat ?? null,
                     roomName,
                     messages,
+                    activeFlow,
                     configurationEntries,
                     selectedConfiguration,
                     isLoading: false,
@@ -129,13 +147,13 @@ export function useConversation(chatId: string) {
 
         try {
             await chatRepository.sendMessage(chat, text, promptId, vectorStoreIds)
-            await loadMessages()
+            await Promise.all([loadMessages(), loadActiveFlow()])
         } catch (e) {
             setState((s) => ({ ...s, error: String(e) }))
         } finally {
             setState((s) => ({ ...s, isLoading: false }))
         }
-    }, [state.chat, state.inputText, state.messages, state.selectedConfiguration, loadMessages])
+    }, [state.chat, state.inputText, state.selectedConfiguration, loadActiveFlow, loadMessages])
 
     const requiresConfigurationSelection = !state.selectedConfiguration
 

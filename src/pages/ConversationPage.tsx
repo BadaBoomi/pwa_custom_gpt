@@ -11,6 +11,7 @@ export default function ConversationPage() {
         chat,
         roomName,
         messages,
+        activeFlow,
         inputText,
         configurationEntries,
         selectedConfiguration,
@@ -45,6 +46,13 @@ export default function ConversationPage() {
                 <div className={styles.error}>
                     {error}
                     <button onClick={clearError}>✕</button>
+                </div>
+            )}
+
+            {activeFlow && (
+                <div className={styles.flowBanner}>
+                    <span className={styles.flowTitle}>Deterministic mode active</span>
+                    <span className={styles.flowMeta}>{activeFlow.flowType} · {activeFlow.stepLabel}</span>
                 </div>
             )}
 

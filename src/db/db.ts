@@ -25,6 +25,20 @@ export interface Message {
     createdAt: number
 }
 
+export type FlowStatus = 'running' | 'completed' | 'aborted'
+
+export interface FlowSession {
+    chatId: string
+    flowId: string
+    flowType: string
+    status: FlowStatus
+    currentStep: string
+    answers: Record<string, string>
+    resultSummary?: string
+    createdAt: number
+    updatedAt: number
+}
+
 // ── Database ──────────────────────────────────────────────────────────────────
 // Android: AppDatabase (Room) version 1
 // PWA:     AppDb (Dexie)     version 1
@@ -33,6 +47,7 @@ class AppDb extends Dexie {
     rooms!: EntityTable<Room, 'id'>
     chats!: EntityTable<Chat, 'id'>
     messages!: EntityTable<Message, 'id'>
+    flowSessions!: EntityTable<FlowSession, 'chatId'>
 
     constructor() {
         super('acustomgpt_db')
@@ -42,6 +57,14 @@ class AppDb extends Dexie {
             rooms: 'id, createdAt',
             chats: 'id, roomId, createdAt',
             messages: 'id, chatId, createdAt',
+        })
+
+        // Version 2 — adds deterministic flow session persistence.
+        this.version(2).stores({
+            rooms: 'id, createdAt',
+            chats: 'id, roomId, createdAt',
+            messages: 'id, chatId, createdAt',
+            flowSessions: 'chatId, status, updatedAt',
         })
     }
 }

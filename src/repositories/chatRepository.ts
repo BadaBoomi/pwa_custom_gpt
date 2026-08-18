@@ -1,7 +1,13 @@
 // Entspricht Android: ChatRepositoryImpl
 // Enthält CRUD für Rooms, Chats, Messages sowie sendMessage (API-Aufruf delegiert an openAiService).
 
-import { db, type Chat, type Message, type Room } from '@/db/db'
+import { db, type Chat, type FlowSession, type Message, type Room } from '@/db/db'
+import {
+    createInitialFlowSession,
+    getInitialPrompt,
+    handleFlowTurn,
+    parseRuleFlowDirective,
+} from '@/flows/ruleFlowEngine'
 import { openAiService, getTextContent } from '@/services/openAiService'
 import { settingsRepository } from '@/repositories/settingsRepository'
 import { splitAssistantResponse } from '@/utils/messageUtils'
@@ -11,6 +17,40 @@ function uuid(): string {
 }
 
 const RESPONSE_STATUS_COMPLETED = 'completed'
+
+function createAssistantMessage(chatId: string, content: string, createdAt = Date.now()): Message {
+    return {
+        id: uuid(),
+        chatId,
+        role: 'assistant',
+        content,
+        createdAt,
+    }
+}
+
+function toFlowStepLabel(step: string): string {
+    switch (step) {
+        case 'ask_name':
+            return 'Name'
+        case 'ask_contact_method':
+            return 'Contact Method'
+        case 'confirm':
+            return 'Confirmation'
+        default:
+            return 'In Progress'
+    }
+}
+
+function getFlowPreview(session: FlowSession) {
+    return {
+        flowId: session.flowId,
+        flowType: session.flowType,
+        status: session.status,
+        currentStep: session.currentStep,
+        stepLabel: toFlowStepLabel(session.currentStep),
+        updatedAt: session.updatedAt,
+    }
+}
 
 export const chatRepository = {
     // ── Rooms ─────────────────────────────────────────────────────────────────
@@ -35,6 +75,7 @@ export const chatRepository = {
         const chatIds = chats.map((c) => c.id)
         if (chatIds.length > 0) {
             await db.messages.where('chatId').anyOf(chatIds).delete()
+            await db.flowSessions.where('chatId').anyOf(chatIds).delete()
             await db.chats.where('roomId').equals(room.id).delete()
         }
         await db.rooms.delete(room.id)
@@ -65,6 +106,7 @@ export const chatRepository = {
 
     async deleteChat(chat: Chat): Promise<void> {
         await db.messages.where('chatId').equals(chat.id).delete()
+        await db.flowSessions.delete(chat.id)
         await db.chats.delete(chat.id)
     },
 
@@ -82,6 +124,28 @@ export const chatRepository = {
         return db.messages.where('chatId').equals(chatId).sortBy('createdAt')
     },
 
+    async getActiveFlowForChat(chatId: string): Promise<ReturnType<typeof getFlowPreview> | null> {
+        const session = await db.flowSessions.get(chatId)
+        if (!session || session.status !== 'running') return null
+        return getFlowPreview(session)
+    },
+
+    async abortFlowForChat(chatId: string, reason?: string): Promise<void> {
+        const existing = await db.flowSessions.get(chatId)
+        if (!existing || existing.status !== 'running') return
+
+        await db.flowSessions.update(chatId, {
+            status: 'aborted',
+            updatedAt: Date.now(),
+        })
+
+        const assistantText = reason
+            ? `Deterministic flow aborted: ${reason}`
+            : 'Deterministic flow aborted.'
+
+        await db.messages.add(createAssistantMessage(chatId, assistantText))
+    },
+
     async sendMessage(
         chat: Chat,
         userText: string,
@@ -97,6 +161,25 @@ export const chatRepository = {
             createdAt: Date.now(),
         }
         await db.messages.add(userMessage)
+
+        const activeFlow = await db.flowSessions.get(chat.id)
+        if (activeFlow && activeFlow.status === 'running') {
+            const handled = handleFlowTurn(activeFlow, userText)
+            await db.flowSessions.update(chat.id, {
+                currentStep: handled.nextStep,
+                status: handled.status,
+                answers: handled.answers,
+                resultSummary: handled.resultSummary,
+                updatedAt: Date.now(),
+            })
+
+            await db.messages.add(createAssistantMessage(chat.id, handled.assistantReply))
+
+            if (handled.status === 'completed') {
+                await db.flowSessions.delete(chat.id)
+            }
+            return
+        }
 
         // 2. API-Request zusammenbauen
         const userId = settingsRepository.getUserEmail()?.trim() ?? ''
@@ -120,21 +203,43 @@ export const chatRepository = {
 
         // 3. Antwort-Nachrichten lokal speichern
         const now = Date.now()
-        const newMessages: Message[] = response.output
+        const newMessages: Message[] = []
+        let requestedFlowType: string | null = null
+
+        response.output
             .filter((item) => item.type === 'message' && item.role === 'assistant')
-            .flatMap((item, msgIndex) => {
-                const parts = splitAssistantResponse(getTextContent(item))
-                return parts.map((part, partIndex) => ({
-                    id: partIndex === 0 ? item.id : `${item.id}_${partIndex}`,
-                    chatId: chat.id,
-                    role: 'assistant' as const,
-                    content: part,
-                    createdAt: now + msgIndex * 10 + partIndex,
-                }))
+            .forEach((item, msgIndex) => {
+                const rawText = getTextContent(item)
+                const directive = parseRuleFlowDirective(rawText)
+                const contentForDisplay = directive ? directive.cleanedText : rawText
+
+                if (directive && !requestedFlowType) {
+                    requestedFlowType = directive.flowType
+                }
+
+                const parts = splitAssistantResponse(contentForDisplay)
+                parts.forEach((part, partIndex) => {
+                    if (!part.trim()) return
+                    newMessages.push({
+                        id: partIndex === 0 ? item.id : `${item.id}_${partIndex}`,
+                        chatId: chat.id,
+                        role: 'assistant',
+                        content: part,
+                        createdAt: now + msgIndex * 10 + partIndex,
+                    })
+                })
             })
 
         if (newMessages.length > 0) {
             await db.messages.bulkAdd(newMessages)
+        }
+
+        if (requestedFlowType) {
+            const flowSession = createInitialFlowSession(chat.id, requestedFlowType)
+            await db.flowSessions.put(flowSession)
+
+            const initialPrompt = getInitialPrompt(flowSession.flowType)
+            await db.messages.add(createAssistantMessage(chat.id, initialPrompt, Date.now() + 1))
         }
     },
 }
