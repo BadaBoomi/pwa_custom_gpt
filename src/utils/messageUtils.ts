@@ -42,7 +42,7 @@ export function extractInlineResponseButtons(text: string): {
     cleanedText: string
     buttons: InlineResponseButton[]
 } {
-    const pattern = /\[\[buttons:\s*([\s\S]*?)\]\]/gi
+    const pattern = /\[\[buttons:\s*([\s\S]*?)\]\](?!\])/gi
     const matches = Array.from(text.matchAll(pattern))
     if (matches.length === 0) {
         return { cleanedText: text, buttons: [] }

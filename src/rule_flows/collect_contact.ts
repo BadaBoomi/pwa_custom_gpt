@@ -3,6 +3,12 @@ import type { FlowHandlingResult, RuleFlowHandler } from '@/flows/flowTypes'
 import { DEFAULT_RULE_FLOW_TYPE } from '@/flows/ruleFlowEngine'
 
 const EMAIL_OR_PHONE = new Set(['email', 'phone'])
+const EMAIL_PHONE_BUTTONS_TOKEN = '[[buttons:[email|email],[phone|phone]]]'
+const YES_NO_BUTTONS_TOKEN = '[[buttons:[yes|yes],[no|no]]]'
+
+function withButtons(text: string, token: string): string {
+    return `${text}\n${token}`
+}
 
 function runningReply(session: FlowSession, assistantReply: string): FlowHandlingResult {
     return {
@@ -37,14 +43,14 @@ const collectContactFlow: RuleFlowHandler = {
                 nextStep: 'ask_contact_method',
                 status: 'running',
                 answers: { ...session.answers, name: input },
-                assistantReply: 'Preferred contact method: email or phone?',
+                assistantReply: withButtons('Preferred contact method: email or phone?', EMAIL_PHONE_BUTTONS_TOKEN),
             }
         }
 
         if (session.currentStep === 'ask_contact_method') {
             const method = input.toLowerCase()
             if (!EMAIL_OR_PHONE.has(method)) {
-                return runningReply(session, 'Please reply with exactly "email" or "phone".')
+                return runningReply(session, withButtons('Please reply with exactly "email" or "phone".', EMAIL_PHONE_BUTTONS_TOKEN))
             }
 
             const answers: Record<string, string> = { ...session.answers, contactMethod: method }
@@ -52,7 +58,10 @@ const collectContactFlow: RuleFlowHandler = {
                 nextStep: 'confirm',
                 status: 'running',
                 answers,
-                assistantReply: `Confirm: name=${answers.name}, contact=${answers.contactMethod}. Reply yes or no.`,
+                assistantReply: withButtons(
+                    `Confirm: name=${answers.name}, contact=${answers.contactMethod}. Reply yes or no.`,
+                    YES_NO_BUTTONS_TOKEN,
+                ),
             }
         }
 
@@ -78,7 +87,7 @@ const collectContactFlow: RuleFlowHandler = {
                 }
             }
 
-            return runningReply(session, 'Please answer with yes or no.')
+            return runningReply(session, withButtons('Please answer with yes or no.', YES_NO_BUTTONS_TOKEN))
         }
 
         return {
