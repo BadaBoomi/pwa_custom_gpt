@@ -2,12 +2,8 @@
 // Enthält CRUD für Rooms, Chats, Messages sowie sendMessage (API-Aufruf delegiert an openAiService).
 
 import { db, type Chat, type FlowSession, type Message, type Room } from '@/db/db'
-import {
-    createInitialFlowSession,
-    getInitialPrompt,
-    handleFlowTurn,
-    parseRuleFlowDirective,
-} from '@/flows/ruleFlowEngine'
+import { getRuleFlowHandler } from '@/flows/flowRegistry'
+import { createInitialFlowSession, parseRuleFlowDirective } from '@/flows/ruleFlowEngine'
 import { openAiService, getTextContent } from '@/services/openAiService'
 import { settingsRepository } from '@/repositories/settingsRepository'
 import { splitAssistantResponse } from '@/utils/messageUtils'
@@ -26,6 +22,10 @@ function createAssistantMessage(chatId: string, content: string, createdAt = Dat
         content,
         createdAt,
     }
+}
+
+function getMissingFlowScriptMessage(flowType: string): string {
+    return `Deterministic flow script "${flowType}" was not found. AI mode resumed.`
 }
 
 function toFlowStepLabel(step: string): string {
@@ -164,7 +164,20 @@ export const chatRepository = {
 
         const activeFlow = await db.flowSessions.get(chat.id)
         if (activeFlow && activeFlow.status === 'running') {
-            const handled = handleFlowTurn(activeFlow, userText)
+            const flowHandler = getRuleFlowHandler(activeFlow.flowType)
+            if (!flowHandler) {
+                await db.flowSessions.update(chat.id, {
+                    status: 'aborted',
+                    updatedAt: Date.now(),
+                })
+
+                await db.messages.add(
+                    createAssistantMessage(chat.id, getMissingFlowScriptMessage(activeFlow.flowType)),
+                )
+                return
+            }
+
+            const handled = flowHandler.handleTurn(activeFlow, userText)
             await db.flowSessions.update(chat.id, {
                 currentStep: handled.nextStep,
                 status: handled.status,
@@ -236,9 +249,17 @@ export const chatRepository = {
 
         if (requestedFlowType) {
             const flowSession = createInitialFlowSession(chat.id, requestedFlowType)
+            const flowHandler = getRuleFlowHandler(flowSession.flowType)
+            if (!flowHandler) {
+                await db.messages.add(
+                    createAssistantMessage(chat.id, getMissingFlowScriptMessage(flowSession.flowType), Date.now() + 1),
+                )
+                return
+            }
+
             await db.flowSessions.put(flowSession)
 
-            const initialPrompt = getInitialPrompt(flowSession.flowType)
+            const initialPrompt = flowHandler.getInitialPrompt(flowSession.flowType)
             await db.messages.add(createAssistantMessage(chat.id, initialPrompt, Date.now() + 1))
         }
     },
