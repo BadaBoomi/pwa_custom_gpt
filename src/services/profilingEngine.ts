@@ -35,6 +35,14 @@ function withButtons(text: string, token: string): string {
     return `${text}\n${token}`
 }
 
+function withAliasSet(text: string, alias: string): string {
+    return `${text}\n[set|Alias|${alias}]`
+}
+
+function withAliasGet(text: string): string {
+    return `${text}\n[get|Alias]`
+}
+
 function buildMenuButtonsToken(profilingCount: number): string {
     const numbered = Array.from({ length: profilingCount }, (_, idx) => `[${idx + 1}|${idx + 1}]`).join(',')
     const parts = numbered ? `${numbered},[neu|neu]` : '[neu|neu]'
@@ -118,7 +126,7 @@ function categoryPrompt(alias: string, category: string, statements: Phase1State
         : '\n\nAntworten Sie mit einer Zahl von 1 bis 9.'
 
     const token = isOptional ? ONE_TO_NINE_WITH_SKIP_BUTTONS_TOKEN : ONE_TO_NINE_BUTTONS_TOKEN
-    return `${header}\n\nAussagen:\n${lines.join('\n')}${suffix}\n${token}`
+    return withAliasGet(`${header}\n\nAussagen:\n${lines.join('\n')}${suffix}\n${token}`)
 }
 
 function rankTypes(scores: Record<string, number>, mandatoryScores?: Record<string, number>): number[] {
@@ -137,14 +145,14 @@ function rankTypes(scores: Record<string, number>, mandatoryScores?: Record<stri
 }
 
 function buildPhase1ResultText(alias: string, mainType: number, secondaryType: number): string {
-    return [
+    return withAliasGet([
         `Das Phase-1-Profil fuer ${alias} ist abgeschlossen.`,
         '',
         `Etablierter W&W-Typ nach Phase 1: W&W-Typ ${mainType}`,
         `Nebenauspraegung: W&W-Typ ${secondaryType}`,
         '',
         'Bitte beachten Sie: Dies ist eine vertriebspraktische Arbeitshypothese auf Basis des ersten Eindrucks und keine psychologische Diagnose.',
-    ].join('\n')
+    ].join('\n'))
 }
 
 function availableByType(phase2: Phase2Statement[], latestScores: Record<string, number>): Record<number, Phase2Statement[]> {
@@ -307,7 +315,7 @@ export async function resolveMenuInput(chatId: string, input: string): Promise<M
         return {
             type: 'resume',
             profilingId: selected.id,
-            assistantReply: `Profiling "${selected.alias}" wird fortgesetzt.`,
+            assistantReply: withAliasSet(`Profiling "${selected.alias}" wird fortgesetzt.`, selected.alias),
         }
     }
 
@@ -370,10 +378,10 @@ export async function createProfilingFromAlias(chatId: string, aliasInput: strin
     const confirmText = await getTextBlock('alias_confirm')
     return {
         profiling,
-        assistantReply: withButtons(
+        assistantReply: withAliasSet(withButtons(
             `Alias "${alias}" wurde angelegt.\n\nBitte bestaetigen Sie mit "ja":\n${confirmText?.text ?? ''}`.trim(),
             YES_BUTTONS_TOKEN,
-        ),
+        ), alias),
     }
 }
 
@@ -424,13 +432,13 @@ function buildPhase2StatementPrompt(state: ProfilingStateData): string {
     const item = currentRound.items[state.phase2CurrentItemIndex]
     if (!item) return 'Es wurde keine offene Aussage gefunden.'
 
-    return withButtons([
+    return withAliasGet(withButtons([
         `Aussage ${state.phase2CurrentItemIndex + 1} von 9:`,
         '',
         item.statement,
         '',
         `Bitte bewerten Sie diese Aussage fuer ${state.alias} mit 0 bis 5.`,
-    ].join('\n'), ZERO_TO_FIVE_BUTTONS_TOKEN)
+    ].join('\n'), ZERO_TO_FIVE_BUTTONS_TOKEN))
 }
 
 function parseScoreInput(input: string, min: number, max: number): number | null {
@@ -793,7 +801,7 @@ export async function continueProfilingTurn(profiling: Profiling, userInput: str
             const finalMain = state.phase2MainType ?? state.phase1MainType ?? 1
             const finalSecondary = state.phase2SecondaryType ?? state.phase1SecondaryType ?? 2
             return {
-                reply: `${replaceAlias(completion?.text ?? 'Profiling abgeschlossen.', state.alias)}\n\nFinaler W&W-Typ: ${finalMain}\nFinale Nebenauspraegung: ${finalSecondary}`,
+                reply: withAliasGet(`${replaceAlias(completion?.text ?? 'Profiling abgeschlossen.', state.alias)}\n\nFinaler W&W-Typ: ${finalMain}\nFinale Nebenauspraegung: ${finalSecondary}`),
                 stateJson: stringifyState(state),
                 stepKey: 'completed',
                 status: 'completed',

@@ -27,7 +27,7 @@ function running(
 const profilingFlow: RuleFlowHandler = {
     async getInitialPrompt(_flowType: string, session: FlowSession): Promise<string> {
         const menu = await buildProfilingMenuPrompt(session.chatId)
-        return `${menu}\n\nUm ein neues Profiling zu starten, antworten Sie mit "neu" oder direkt mit einem Alias.`
+        return `${menu}\n\nUm ein neues Profiling zu starten, geben Sie jetzt bitte den Alias an.`
     },
 
     async handleTurn(session: FlowSession, userInput: string): Promise<FlowHandlingResult> {
@@ -54,6 +54,18 @@ const profilingFlow: RuleFlowHandler = {
 
             const resolution = await resolveMenuInput(session.chatId, input)
             if (resolution.type === 'create_alias') {
+                const normalized = input.trim().toLowerCase()
+                if (normalized !== 'neu' && normalized !== 'new' && normalized !== 'n') {
+                    const created = await createProfilingFromAlias(session.chatId, input)
+                    if (!created.profiling) {
+                        return running(session, created.assistantReply, answers, 'profiling_alias_input')
+                    }
+
+                    answers.activeProfilingId = created.profiling.id
+                    delete answers.pendingAliasInput
+                    return running(session, created.assistantReply, answers, 'profiling_alias_confirm')
+                }
+
                 answers.pendingAliasInput = '1'
                 return running(session, resolution.assistantReply, answers, 'profiling_alias_input')
             }
