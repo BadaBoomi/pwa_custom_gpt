@@ -55,14 +55,14 @@ export function useConversation(chatId: string) {
     })
 
     const loadConversationSnapshot = useCallback(async () => {
-        const [chat, messages, activeFlow, rooms] = await Promise.all([
-            chatRepository.getChatById(chatId),
+        const chat = await chatRepository.getChatById(chatId)
+        const [messages, activeFlow, room] = await Promise.all([
             chatRepository.getMessagesForChat(chatId),
             chatRepository.getActiveFlowForChat(chatId),
-            chatRepository.getAllRooms(),
+            chat ? chatRepository.getRoomById(chat.roomId) : Promise.resolve(undefined),
         ])
 
-        const roomName = chat ? formatRoomLabel(rooms.find((room) => room.id === chat.roomId)) : ''
+        const roomName = chat ? formatRoomLabel(room) : ''
         return { chat: chat ?? null, messages, activeFlow, roomName }
     }, [chatId])
 
@@ -150,7 +150,13 @@ export function useConversation(chatId: string) {
         try {
             await chatRepository.sendMessage(chat, text, promptId, vectorStoreIds)
             const snapshot = await loadConversationSnapshot()
-            setState((s) => ({ ...s, ...snapshot }))
+            setState((s) => ({
+                ...s,
+                chat: snapshot.chat,
+                messages: snapshot.messages,
+                activeFlow: snapshot.activeFlow,
+                roomName: snapshot.roomName,
+            }))
         } catch (e) {
             setState((s) => ({ ...s, error: String(e) }))
         } finally {

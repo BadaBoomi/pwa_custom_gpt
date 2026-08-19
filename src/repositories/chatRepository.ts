@@ -60,6 +60,10 @@ export const chatRepository = {
         return db.rooms.orderBy('createdAt').reverse().toArray()
     },
 
+    async getRoomById(roomId: string): Promise<Room | undefined> {
+        return db.rooms.get(roomId)
+    },
+
     async createRoom(name: string): Promise<Room> {
         const room: Room = { id: uuid(), name, customAttributes: {}, createdAt: Date.now() }
         await db.rooms.add(room)
@@ -223,33 +227,34 @@ export const chatRepository = {
         let roomCustomAttributes = normalizeRoomCustomAttributes(room?.customAttributes)
         let didUpdateRoomAttributes = false
 
-        response.output
+        const assistantMessages = response.output
             .filter((item) => item.type === 'message' && item.role === 'assistant')
-            .forEach((item, msgIndex) => {
-                const rawText = getTextContent(item)
-                const directive = parseRuleFlowDirective(rawText)
-                const contentForDisplay = directive ? directive.cleanedText : rawText
-                const attributeResult = applyRoomAttributeDirectives(contentForDisplay, roomCustomAttributes)
 
-                if (directive && !requestedFlowType) {
-                    requestedFlowType = directive.flowType
-                }
+        for (const [msgIndex, item] of assistantMessages.entries()) {
+            const rawText = getTextContent(item)
+            const attributeResult = applyRoomAttributeDirectives(rawText, roomCustomAttributes)
+            const directive = parseRuleFlowDirective(attributeResult.cleanedText)
+            const contentForDisplay = directive ? directive.cleanedText : attributeResult.cleanedText
 
-                roomCustomAttributes = attributeResult.customAttributes
-                didUpdateRoomAttributes = didUpdateRoomAttributes || attributeResult.didUpdateAttributes
+            if (directive && !requestedFlowType) {
+                requestedFlowType = directive.flowType
+            }
 
-                const parts = splitAssistantResponse(attributeResult.cleanedText)
-                parts.forEach((part, partIndex) => {
-                    if (!part.trim()) return
-                    newMessages.push({
-                        id: partIndex === 0 ? item.id : `${item.id}_${partIndex}`,
-                        chatId: chat.id,
-                        role: 'assistant',
-                        content: part,
-                        createdAt: now + msgIndex * 10 + partIndex,
-                    })
+            roomCustomAttributes = attributeResult.customAttributes
+            didUpdateRoomAttributes = didUpdateRoomAttributes || attributeResult.didUpdateAttributes
+
+            const parts = splitAssistantResponse(contentForDisplay)
+            parts.forEach((part, partIndex) => {
+                if (!part.trim()) return
+                newMessages.push({
+                    id: partIndex === 0 ? item.id : `${item.id}_${partIndex}`,
+                    chatId: chat.id,
+                    role: 'assistant',
+                    content: part,
+                    createdAt: now + msgIndex * 10 + partIndex,
                 })
             })
+        }
 
         if (room && didUpdateRoomAttributes) {
             await db.rooms.update(room.id, { customAttributes: roomCustomAttributes })

@@ -57,10 +57,32 @@ async function computeContentSignature(): Promise<string> {
         db.flowSessions.toArray(),
     ])
     return JSON.stringify({
-        rooms: rooms.map((r) => r.id + r.name + JSON.stringify(normalizeRoomCustomAttributes(r.customAttributes)) + r.createdAt),
-        chats: chats.map((c) => c.id + c.roomId + c.name + c.threadId + c.createdAt),
-        messages: messages.map((m) => m.id + m.chatId + m.role + m.content + m.createdAt),
-        flowSessions: flowSessions.map((f) => f.chatId + f.status + f.currentStep + f.updatedAt),
+        rooms: rooms.map((r) => ({
+            id: r.id,
+            name: r.name,
+            customAttributes: normalizeRoomCustomAttributes(r.customAttributes),
+            createdAt: r.createdAt,
+        })),
+        chats: chats.map((c) => ({
+            id: c.id,
+            roomId: c.roomId,
+            name: c.name,
+            threadId: c.threadId,
+            createdAt: c.createdAt,
+        })),
+        messages: messages.map((m) => ({
+            id: m.id,
+            chatId: m.chatId,
+            role: m.role,
+            content: m.content,
+            createdAt: m.createdAt,
+        })),
+        flowSessions: flowSessions.map((f) => ({
+            chatId: f.chatId,
+            status: f.status,
+            currentStep: f.currentStep,
+            updatedAt: f.updatedAt,
+        })),
     })
 }
 

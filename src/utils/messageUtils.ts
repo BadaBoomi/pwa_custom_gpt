@@ -48,13 +48,23 @@ export function applyRoomAttributeDirectives(
 } {
     const nextAttributes = { ...currentAttributes }
     let didUpdateAttributes = false
-
-    const withoutSetDirectives = text.replace(
-        /\[set\|([^|\]]+?)\|([^\]]*?)\]/gi,
-        (_, rawKey: string, rawValue: string) => {
+    const cleanedText = text
+        .replace(/\[(set|get)\|([^|\]]+?)(?:\|([^\]]*?))?\]/gi, (_, action: string, rawKey: string, rawValue?: string) => {
             const key = rawKey.trim()
-            const value = rawValue.trim()
-            if (!key || !value) return ''
+            if (!key) return ''
+
+            if (action.toLowerCase() === 'get') {
+                return nextAttributes[key] ?? ''
+            }
+
+            const value = (rawValue ?? '').trim()
+            if (!value) {
+                if (key in nextAttributes) {
+                    delete nextAttributes[key]
+                    didUpdateAttributes = true
+                }
+                return ''
+            }
 
             if (nextAttributes[key] !== value) {
                 nextAttributes[key] = value
@@ -62,13 +72,6 @@ export function applyRoomAttributeDirectives(
             }
 
             return ''
-        },
-    )
-
-    const cleanedText = withoutSetDirectives
-        .replace(/\[get\|([^|\]]+?)\]/gi, (_, rawKey: string) => {
-            const key = rawKey.trim()
-            return key ? nextAttributes[key] ?? '' : ''
         })
         .replace(/\n{3,}/g, '\n\n')
         .trim()
