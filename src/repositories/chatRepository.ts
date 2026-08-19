@@ -177,7 +177,7 @@ export const chatRepository = {
                 return
             }
 
-            const handled = flowHandler.handleTurn(activeFlow, userText)
+            const handled = await flowHandler.handleTurn(activeFlow, userText)
             await db.flowSessions.update(chat.id, {
                 currentStep: handled.nextStep,
                 status: handled.status,
@@ -259,7 +259,7 @@ export const chatRepository = {
 
             await db.flowSessions.put(flowSession)
 
-            const initialPrompt = flowHandler.getInitialPrompt(flowSession.flowType)
+            const initialPrompt = await flowHandler.getInitialPrompt(flowSession.flowType, flowSession)
             await db.messages.add(createAssistantMessage(chat.id, initialPrompt, Date.now() + 1))
         }
     },
