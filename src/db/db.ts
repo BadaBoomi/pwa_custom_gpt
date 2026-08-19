@@ -6,7 +6,8 @@ import Dexie, { type EntityTable } from 'dexie'
 export interface Room {
     id: string
     name: string
-    createdAt: number
+    customAttributes?: Record<string, string>
+    createdAt: number // Unix ms
 }
 
 export interface Chat {
@@ -120,15 +121,19 @@ class AppDb extends Dexie {
             flowSessions: 'chatId, status, updatedAt',
         })
 
-        this.version(3).stores({
-            rooms: 'id, createdAt',
-            chats: 'id, roomId, createdAt',
-            messages: 'id, chatId, createdAt',
-            flowSessions: 'chatId, status, updatedAt',
-            profilings: 'id, chatId, userScopeId, aliasNormalized, status, updatedAt',
-            profilingResponses: 'id, profilingId, phase, roundNumber, statementId',
-            profilingTextBlocks: 'id, key, version, active',
-        })
+        // Version 3 — adds room-level custom attributes.
+        this.version(3)
+            .stores({
+                rooms: 'id, createdAt',
+                chats: 'id, roomId, createdAt',
+                messages: 'id, chatId, createdAt',
+                flowSessions: 'chatId, status, updatedAt',
+            })
+            .upgrade(async (tx) => {
+                await tx.table('rooms').toCollection().modify((room: Room) => {
+                    room.customAttributes ??= {}
+                })
+            })
     }
 }
 

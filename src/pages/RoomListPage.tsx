@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useRooms } from '@/hooks/useRooms'
 import type { Room } from '@/db/db'
+import { formatRoomLabel } from '@/utils/roomUtils'
 import styles from './RoomListPage.module.css'
 
 export default function RoomListPage() {
@@ -76,7 +77,7 @@ export default function RoomListPage() {
                             ) : (
                                 <>
                                     <span className={styles.name} onClick={() => navigate(`/rooms/${room.id}`)}>
-                                        {room.name}
+                                        {formatRoomLabel(room)}
                                     </span>
                                     <div className={styles.actions}>
                                         <button onClick={() => startEdit(room)}>✎</button>
