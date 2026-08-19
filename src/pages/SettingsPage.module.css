@@ -160,3 +160,90 @@
     color: #9aa4c5;
     font-size: 0.8rem;
 }
+
+/* ── Backup section ──────────────────────────────────────────────────────── */
+
+.backupSection {
+    border-top: 1px solid #2a2a2a;
+    padding-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.backupTitle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #e7e7e7;
+}
+
+.backupIndicators {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.badgeSaved {
+    display: inline-block;
+    background: #1a3a2a;
+    color: #6bffb8;
+    border: 1px solid #2a6a4a;
+    border-radius: 6px;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+}
+
+.badgeUnsaved {
+    display: inline-block;
+    background: #3a1a1a;
+    color: #ffb86b;
+    border: 1px solid #6a3a1a;
+    border-radius: 6px;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.82rem;
+    font-weight: 500;
+}
+
+.backupWarning {
+    font-size: 0.82rem;
+    color: #ffb86b;
+    background: #2a1a0a;
+    border: 1px solid #5a3a0a;
+    border-radius: 6px;
+    padding: 0.45rem 0.65rem;
+}
+
+.backupActions {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+}
+
+.backupBtn {
+    background: #222f5a;
+    color: #dce7ff;
+    border: 1px solid #3554aa;
+    border-radius: 8px;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.9rem;
+}
+
+.backupBtn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.hiddenInput {
+    display: none;
+}
+
+.backupError {
+    color: #ff8f8f;
+    font-size: 0.85rem;
+}
+
+.backupSuccess {
+    color: #6bffb8;
+    font-size: 0.85rem;
+}
