@@ -30,6 +30,7 @@ const ZERO_TO_FIVE_BUTTONS_TOKEN = '[[buttons:[0|0],[1|1],[2|2],[3|3],[4|4],[5|5
 const YES_NO_BUTTONS_TOKEN = '[[buttons:[ja|ja],[nein|nein]]]'
 const YES_BUTTONS_TOKEN = '[[buttons:[ja|ja]]]'
 const OPTIONAL_CATEGORY_BUTTONS_TOKEN = '[[buttons:[keine|keine],[alle|alle],[1|1],[2|2],[3|3]]]'
+const ALIAS_GET_TOKEN = '[get|Alias]'
 
 function withButtons(text: string, token: string): string {
     return `${text}\n${token}`
@@ -37,10 +38,6 @@ function withButtons(text: string, token: string): string {
 
 function withAliasSet(text: string, alias: string): string {
     return `${text}\n[set|Alias|${alias}]`
-}
-
-function withAliasGet(text: string): string {
-    return `${text}\n[get|Alias]`
 }
 
 function buildMenuButtonsToken(profilingCount: number): string {
@@ -103,7 +100,8 @@ function toTypeMap(): Record<string, number> {
 }
 
 function replaceAlias(text: string, alias: string): string {
-    return text.replace(/\[Alias\]/g, alias)
+    void alias
+    return text.replace(/\[Alias\]/g, ALIAS_GET_TOKEN)
 }
 
 function normalizeCategoryName(raw: string): string {
@@ -118,15 +116,16 @@ function sortByTypeAndId<T extends { wwType: number; id: number }>(items: T[]): 
 }
 
 function categoryPrompt(alias: string, category: string, statements: Phase1Statement[], isOptional: boolean): string {
+    void alias
     const title = isOptional ? `Zusatzkategorie: ${category}` : `Kategorie: ${category}`
-    const header = `${title}\n\nBitte waehlen Sie die Aussage, die am besten zu ${alias} passt.`
+    const header = `${title}\n\nBitte waehlen Sie die Aussage, die am besten zu ${ALIAS_GET_TOKEN} passt.`
     const lines = sortByTypeAndId(statements).map((item, idx) => `${idx + 1}. ${item.statement}`)
     const suffix = isOptional
         ? '\n\nAntworten Sie mit 1 bis 9 oder schreiben Sie "skip" zum Ueberspringen.'
         : '\n\nAntworten Sie mit einer Zahl von 1 bis 9.'
 
     const token = isOptional ? ONE_TO_NINE_WITH_SKIP_BUTTONS_TOKEN : ONE_TO_NINE_BUTTONS_TOKEN
-    return withAliasGet(`${header}\n\nAussagen:\n${lines.join('\n')}${suffix}\n${token}`)
+    return `${header}\n\nAussagen:\n${lines.join('\n')}${suffix}\n${token}`
 }
 
 function rankTypes(scores: Record<string, number>, mandatoryScores?: Record<string, number>): number[] {
@@ -145,14 +144,15 @@ function rankTypes(scores: Record<string, number>, mandatoryScores?: Record<stri
 }
 
 function buildPhase1ResultText(alias: string, mainType: number, secondaryType: number): string {
-    return withAliasGet([
-        `Das Phase-1-Profil fuer ${alias} ist abgeschlossen.`,
+    void alias
+    return [
+        `Das Phase-1-Profil fuer ${ALIAS_GET_TOKEN} ist abgeschlossen.`,
         '',
         `Etablierter W&W-Typ nach Phase 1: W&W-Typ ${mainType}`,
         `Nebenauspraegung: W&W-Typ ${secondaryType}`,
         '',
         'Bitte beachten Sie: Dies ist eine vertriebspraktische Arbeitshypothese auf Basis des ersten Eindrucks und keine psychologische Diagnose.',
-    ].join('\n'))
+    ].join('\n')
 }
 
 function availableByType(phase2: Phase2Statement[], latestScores: Record<string, number>): Record<number, Phase2Statement[]> {
@@ -432,13 +432,13 @@ function buildPhase2StatementPrompt(state: ProfilingStateData): string {
     const item = currentRound.items[state.phase2CurrentItemIndex]
     if (!item) return 'Es wurde keine offene Aussage gefunden.'
 
-    return withAliasGet(withButtons([
+    return withButtons([
         `Aussage ${state.phase2CurrentItemIndex + 1} von 9:`,
         '',
         item.statement,
         '',
-        `Bitte bewerten Sie diese Aussage fuer ${state.alias} mit 0 bis 5.`,
-    ].join('\n'), ZERO_TO_FIVE_BUTTONS_TOKEN))
+        `Bitte bewerten Sie diese Aussage fuer ${ALIAS_GET_TOKEN} mit 0 bis 5.`,
+    ].join('\n'), ZERO_TO_FIVE_BUTTONS_TOKEN)
 }
 
 function parseScoreInput(input: string, min: number, max: number): number | null {
@@ -801,7 +801,7 @@ export async function continueProfilingTurn(profiling: Profiling, userInput: str
             const finalMain = state.phase2MainType ?? state.phase1MainType ?? 1
             const finalSecondary = state.phase2SecondaryType ?? state.phase1SecondaryType ?? 2
             return {
-                reply: withAliasGet(`${replaceAlias(completion?.text ?? 'Profiling abgeschlossen.', state.alias)}\n\nFinaler W&W-Typ: ${finalMain}\nFinale Nebenauspraegung: ${finalSecondary}`),
+                reply: `${replaceAlias(completion?.text ?? 'Profiling abgeschlossen.', state.alias)}\n\nFinaler W&W-Typ: ${finalMain}\nFinale Nebenauspraegung: ${finalSecondary}`,
                 stateJson: stringifyState(state),
                 stepKey: 'completed',
                 status: 'completed',

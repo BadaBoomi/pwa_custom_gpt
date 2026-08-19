@@ -134,6 +134,23 @@ class AppDb extends Dexie {
                     room.customAttributes ??= {}
                 })
             })
+
+        // Version 4 — restore profiling tables after merge and keep room custom attributes.
+        this.version(4)
+            .stores({
+                rooms: 'id, createdAt',
+                chats: 'id, roomId, createdAt',
+                messages: 'id, chatId, createdAt',
+                flowSessions: 'chatId, status, updatedAt',
+                profilings: 'id, chatId, userScopeId, aliasNormalized, status, updatedAt',
+                profilingResponses: 'id, profilingId, phase, roundNumber, statementId',
+                profilingTextBlocks: 'id, key, active, updatedAt',
+            })
+            .upgrade(async (tx) => {
+                await tx.table('rooms').toCollection().modify((room: Room) => {
+                    room.customAttributes ??= {}
+                })
+            })
     }
 }
 
