@@ -14,6 +14,7 @@ export default function ConversationPage() {
         activeFlow,
         inputText,
         configurationEntries,
+        responseButtons,
         selectedConfiguration,
         isLoading,
         error,
@@ -24,6 +25,9 @@ export default function ConversationPage() {
         clearError,
     } =
         useConversation(chatId!)
+
+    const actionButtons = responseButtons ?? configurationEntries
+    const isResponseOverrideActive = Boolean(responseButtons && responseButtons.length > 0)
     const bottomRef = useRef<HTMLDivElement>(null)
 
     useEffect(() => {
@@ -77,17 +81,24 @@ export default function ConversationPage() {
             <div className={styles.configSelector}>
                 <div className={styles.configHeaderLine}>
                     <span className={styles.configTitle}>Was möchten Sie tun?</span>
+                    {isResponseOverrideActive && (
+                        <span className={styles.selectedInfo}>Antwort-Buttons aktiv</span>
+                    )}
                     {selectedConfiguration && (
                         <span className={styles.selectedInfo}>Aktiv: {selectedConfiguration.label}</span>
                     )}
                 </div>
 
                 <div className={styles.starters}>
-                    {configurationEntries.map((entry) => (
+                    {actionButtons.map((entry) => (
                         <button
                             key={`${entry.label}-${entry.promptId ?? 'none'}`}
-                            className={`${styles.starterChip} ${selectedConfiguration?.label === entry.label && selectedConfiguration?.promptId === entry.promptId ? styles.starterChipActive : ''}`}
+                            className={`${styles.starterChip} ${!isResponseOverrideActive && selectedConfiguration?.label === entry.label && selectedConfiguration?.promptId === entry.promptId ? styles.starterChipActive : ''}`}
                             onClick={() => {
+                                if (isResponseOverrideActive) {
+                                    onInputChange(entry.prompt)
+                                    return
+                                }
                                 selectConfigurationEntry(entry)
                             }}
                         >

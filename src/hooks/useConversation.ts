@@ -1,8 +1,8 @@
 // Entspricht Android: ConversationViewModel
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { chatRepository } from '@/repositories/chatRepository'
 import { settingsRepository } from '@/repositories/settingsRepository'
-import { parseStarterPrompts } from '@/utils/messageUtils'
+import { extractInlineResponseButtons, parseStarterPrompts } from '@/utils/messageUtils'
 import type { Chat, Message } from '@/db/db'
 
 interface ConfigurationEntry {
@@ -18,6 +18,12 @@ interface ActiveFlow {
     currentStep: string
     stepLabel: string
     updatedAt: number
+}
+
+interface ResponseButtonEntry {
+    label: string
+    prompt: string
+    promptId?: string
 }
 
 const SELECTED_CONFIG_STORAGE_PREFIX = 'selected_config_'
@@ -155,12 +161,56 @@ export function useConversation(chatId: string) {
         }
     }, [state.chat, state.inputText, state.selectedConfiguration, loadActiveFlow, loadMessages])
 
+    const { displayMessages, responseButtons } = useMemo(() => {
+        const displayMessages: Message[] = []
+
+        for (const message of state.messages) {
+            if (message.role !== 'assistant') {
+                displayMessages.push(message)
+                continue
+            }
+
+            const extracted = extractInlineResponseButtons(message.content)
+            const cleaned = extracted.cleanedText.trim()
+            if (!cleaned) continue
+
+            if (cleaned === message.content) {
+                displayMessages.push(message)
+            } else {
+                displayMessages.push({
+                    ...message,
+                    content: cleaned,
+                })
+            }
+        }
+
+        let responseButtons: ResponseButtonEntry[] | null = null
+        for (let i = state.messages.length - 1; i >= 0; i--) {
+            const message = state.messages[i]
+            if (message.role !== 'assistant') continue
+
+            const extracted = extractInlineResponseButtons(message.content)
+            responseButtons = extracted.buttons.length > 0
+                ? extracted.buttons.map((button) => ({
+                    label: button.label,
+                    prompt: button.content,
+                    promptId: undefined,
+                }))
+                : null
+            break
+        }
+
+        return { displayMessages, responseButtons }
+    }, [state.messages])
+
     const requiresConfigurationSelection = !state.selectedConfiguration
 
     const clearError = useCallback(() => setState((s) => ({ ...s, error: null })), [])
 
     return {
         ...state,
+        messages: displayMessages,
+        responseButtons,
         onInputChange,
         selectConfigurationEntry,
         sendMessage,

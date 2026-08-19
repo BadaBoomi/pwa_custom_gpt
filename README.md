@@ -13,6 +13,7 @@ pwa_custom_gpt ist eine lokale, offline-fähiger PWA-Applikation für GPT-basier
 - Local-first Persistenz mit IndexedDB
 - Offline-fähige App-Shell als PWA
 - Trennung von lokaler Persistenz und OpenAI-API-Zugriff
+- Dynamische Antwort-Buttons aus Assistant-Responses mit automatischem Fallback auf Starters
 - Moderne UI mit React und TypeScript
 
 ## Inhaltsverzeichnis
@@ -24,9 +25,10 @@ pwa_custom_gpt ist eine lokale, offline-fähiger PWA-Applikation für GPT-basier
 5. [Authentisierung](#authentisierung)
 6. [Konfiguration von Starters](#konfiguration-von-starters)
 7. [Nutzung](#nutzung)
-8. [Rule Flows](#rule-flows)
-9. [Konfiguration](#konfiguration)
-10. [Lizenz](#lizenz)
+8. [Dynamische Antwort-Buttons](#dynamische-antwort-buttons)
+9. [Rule Flows](#rule-flows)
+10. [Konfiguration](#konfiguration)
+11. [Lizenz](#lizenz)
 
 ## Installation
 
@@ -128,6 +130,61 @@ Zusätzlich bietet die Einstellungsseite:
 - Ohne Label-Auswahl ist kein Senden möglich.
 - Für Dialoge gilt ausschließlich die Prompt-ID aus dem ausgewählten Label.
 - Die globale Prompt-ID wird nur für Konfigurationsanfragen verwendet, nicht für normale Dialognachrichten.
+
+## Dynamische Antwort-Buttons
+
+Zusätzlich zu den konfigurierten Starters kann die Assistant-Antwort temporäre Buttons für den aktuellen Chat setzen.
+
+### Trigger-Format
+
+Unterstütztes Inline-Format in einer Assistant-Textantwort:
+
+```text
+[[buttons:[Label 1|Inhalt 1], [Label 2|Inhalt 2], [Label 3|Inhalt 3]]]
+```
+
+### Verhalten in der UI
+
+- Enthält die letzte Assistant-Antwort ein gültiges `[[buttons:...]]`, dann werden die Starter-Buttons ausgeblendet.
+- Stattdessen werden die im Token definierten Buttons angezeigt.
+- Ein Klick auf einen dieser Buttons setzt den jeweiligen Inhalt in das Eingabefeld.
+- Der Token selbst wird nicht in der sichtbaren Assistant-Nachricht angezeigt.
+- Enthält die letzte Assistant-Antwort kein `[[buttons:...]]`, erscheinen automatisch wieder die normalen Starter-Buttons aus der Konfiguration.
+
+### Hinweise zum Format
+
+- Jeder Button muss als Paar `[Label|Inhalt]` angegeben sein.
+- Leere Labels oder leere Inhalte werden ignoriert.
+- Bei mehreren `[[buttons:...]]`-Blöcken in derselben Nachricht wird der zuletzt gefundene gültige Block verwendet.
+
+### Beispiel Ende-zu-Ende
+
+1. Aktive Standard-Buttons (aus Starters):
+	- `Frage`
+	- `Humor`
+	- `Zusammenfassung`
+
+2. Assistant-Antwort enthält folgenden Text:
+
+```text
+Gerne. Waehlen Sie einen naechsten Schritt:
+[[buttons:[Kurzfassung|Fasse die letzten 3 Antworten in 5 Saetzen zusammen.], [Naechste Frage|Stelle mir eine Rueckfrage zum Zielbild.], [ToDo-Liste|Erzeuge eine priorisierte ToDo-Liste aus dem Chatverlauf.]]]
+```
+
+3. Sichtbares Ergebnis im Chat:
+	- Angezeigt wird nur: `Gerne. Waehlen Sie einen naechsten Schritt:`
+	- Der `[[buttons:...]]`-Block wird aus der sichtbaren Nachricht entfernt.
+
+4. Ergebnis bei den Buttons oberhalb des Eingabefelds:
+	- Die Starter-Buttons werden temporaer ersetzt durch:
+	  - `Kurzfassung`
+	  - `Naechste Frage`
+	  - `ToDo-Liste`
+	- Klick auf `Kurzfassung` setzt den zugehoerigen Inhalt in das Eingabefeld.
+
+5. Fallback:
+	- Die naechste Assistant-Antwort enthaelt keinen `[[buttons:...]]`-Block.
+	- Danach zeigt die UI automatisch wieder die konfigurierten Starter-Buttons an.
 
 ### Schnelltest
 
