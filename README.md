@@ -7,6 +7,7 @@ pwa_custom_gpt ist eine lokale, offline-fähiger PWA-Applikation für GPT-basier
 ## Features
 
 - Unterstützung für mehrere Räume
+- Raumbezogene Custom-Attribute per Assistant-Syntax (`[set|...]`, `[get|...]`)
 - Verwaltung von Konversationen und Nachrichten
 - Setup und Einstellungen für API-Key, Prompt-ID, Vector-Store-IDs und Benutzer-E-Mail
 - Read-only Konfigurationsansicht mit Reload über API
@@ -25,10 +26,11 @@ pwa_custom_gpt ist eine lokale, offline-fähiger PWA-Applikation für GPT-basier
 5. [Authentisierung](#authentisierung)
 6. [Konfiguration von Starters](#konfiguration-von-starters)
 7. [Nutzung](#nutzung)
-8. [Dynamische Antwort-Buttons](#dynamische-antwort-buttons)
-9. [Rule Flows](#rule-flows)
-10. [Konfiguration](#konfiguration)
-11. [Lizenz](#lizenz)
+8. [Raumattribute](#raumattribute)
+9. [Dynamische Antwort-Buttons](#dynamische-antwort-buttons)
+10. [Rule Flows](#rule-flows)
+11. [Konfiguration](#konfiguration)
+12. [Lizenz](#lizenz)
 
 ## Installation
 
@@ -130,6 +132,17 @@ Zusätzlich bietet die Einstellungsseite:
 - Ohne Label-Auswahl ist kein Senden möglich.
 - Für Dialoge gilt ausschließlich die Prompt-ID aus dem ausgewählten Label.
 - Die globale Prompt-ID wird nur für Konfigurationsanfragen verwendet, nicht für normale Dialognachrichten.
+
+## Raumattribute
+
+Assistant-Antworten können Custom-Attribute direkt an den aktuellen Raum schreiben und daraus lesen.
+
+### Syntax
+
+- `[set|Alias|Heiko]` speichert im aktuellen Raum das Attribut `Alias` mit dem Wert `Heiko`
+- `[get|Alias]` wird in der sichtbaren Assistant-Nachricht durch den aktuell gespeicherten Wert ersetzt
+
+Gespeicherte Raumattribute werden überall zusammen mit dem Raumnamen angezeigt, zum Beispiel `Projekt (Alias: Heiko)`.
 
 ## Dynamische Antwort-Buttons
 

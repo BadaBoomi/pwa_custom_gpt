@@ -38,6 +38,48 @@ export interface InlineResponseButton {
     content: string
 }
 
+export function applyRoomAttributeDirectives(
+    text: string,
+    currentAttributes: Record<string, string>,
+): {
+    cleanedText: string
+    customAttributes: Record<string, string>
+    didUpdateAttributes: boolean
+} {
+    const nextAttributes = { ...currentAttributes }
+    let didUpdateAttributes = false
+
+    const withoutSetDirectives = text.replace(
+        /\[set\|([^|\]]+?)\|([^\]]*?)\]/gi,
+        (_, rawKey: string, rawValue: string) => {
+            const key = rawKey.trim()
+            const value = rawValue.trim()
+            if (!key || !value) return ''
+
+            if (nextAttributes[key] !== value) {
+                nextAttributes[key] = value
+                didUpdateAttributes = true
+            }
+
+            return ''
+        },
+    )
+
+    const cleanedText = withoutSetDirectives
+        .replace(/\[get\|([^|\]]+?)\]/gi, (_, rawKey: string) => {
+            const key = rawKey.trim()
+            return key ? nextAttributes[key] ?? '' : ''
+        })
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+
+    return {
+        cleanedText,
+        customAttributes: nextAttributes,
+        didUpdateAttributes,
+    }
+}
+
 export function extractInlineResponseButtons(text: string): {
     cleanedText: string
     buttons: InlineResponseButton[]

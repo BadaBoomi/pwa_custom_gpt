@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { chatRepository } from '@/repositories/chatRepository'
 import type { Chat, Room } from '@/db/db'
+import { formatRoomLabel } from '@/utils/roomUtils'
 
 interface ChatListState {
     chats: Chat[]
@@ -26,7 +27,7 @@ export function useChats(roomId: string) {
                 chatRepository.getChatsForRoom(roomId),
                 chatRepository.getAllRooms(),
             ])
-            const roomName = rooms.find((r) => r.id === roomId)?.name ?? null
+            const roomName = formatRoomLabel(rooms.find((r) => r.id === roomId)) || null
             setState({ chats, rooms, roomName, isLoading: false, error: null })
         } catch (e) {
             setState((s) => ({ ...s, isLoading: false, error: String(e) }))
