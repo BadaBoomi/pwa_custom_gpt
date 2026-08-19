@@ -4,21 +4,21 @@ import Dexie, { type EntityTable } from 'dexie'
 // Entsprechen 1:1 den Android-Entities (RoomEntity, ChatEntity, MessageEntity)
 
 export interface Room {
-    id: string       // UUID
+    id: string
     name: string
-    createdAt: number // Unix ms
+    createdAt: number
 }
 
 export interface Chat {
-    id: string       // UUID
+    id: string
     roomId: string
     name: string
-    threadId: string // OpenAI conversation/thread ID
+    threadId: string
     createdAt: number
 }
 
 export interface Message {
-    id: string       // UUID (or OpenAI output item id)
+    id: string
     chatId: string
     role: 'user' | 'assistant'
     content: string
@@ -39,32 +39,95 @@ export interface FlowSession {
     updatedAt: number
 }
 
+export type ProfilingStatus =
+    | 'alias_created'
+    | 'phase1_running'
+    | 'phase1_done_phase2_not_started'
+    | 'phase2_running'
+    | 'paused'
+    | 'completed'
+
+export interface Profiling {
+    id: string
+    chatId: string
+    userScopeId: string
+    alias: string
+    aliasNormalized: string
+    aliasConfirmed: boolean
+    status: ProfilingStatus
+    currentPhase: 1 | 2
+    phase1MainType?: number
+    phase1SecondaryType?: number
+    phase2MainType?: number
+    phase2SecondaryType?: number
+    stabilityLabel?: string
+    workbookVersion: string
+    textBlockVersion: string
+    currentStepKey: string
+    stateJson: string
+    createdAt: number
+    updatedAt: number
+}
+
+export interface ProfilingResponse {
+    id: string
+    profilingId: string
+    statementId: number
+    statementVersion: string
+    statementTextSnapshot: string
+    value: number
+    answeredAt: number
+    phase: 1 | 2
+    scopeKey: string
+    orderInScope: number
+    roundNumber?: number
+    categoryName?: string
+}
+
+export interface ProfilingTextBlock {
+    id: string
+    key: string
+    version: string
+    text: string
+    active: boolean
+    updatedAt: number
+}
+
 // ── Database ──────────────────────────────────────────────────────────────────
-// Android: AppDatabase (Room) version 1
-// PWA:     AppDb (Dexie)     version 1
 
 class AppDb extends Dexie {
     rooms!: EntityTable<Room, 'id'>
     chats!: EntityTable<Chat, 'id'>
     messages!: EntityTable<Message, 'id'>
     flowSessions!: EntityTable<FlowSession, 'chatId'>
+    profilings!: EntityTable<Profiling, 'id'>
+    profilingResponses!: EntityTable<ProfilingResponse, 'id'>
+    profilingTextBlocks!: EntityTable<ProfilingTextBlock, 'id'>
 
     constructor() {
         super('acustomgpt_db')
 
-        // Version 1 — mirrors Android Room schema
         this.version(1).stores({
             rooms: 'id, createdAt',
             chats: 'id, roomId, createdAt',
             messages: 'id, chatId, createdAt',
         })
 
-        // Version 2 — adds deterministic flow session persistence.
         this.version(2).stores({
             rooms: 'id, createdAt',
             chats: 'id, roomId, createdAt',
             messages: 'id, chatId, createdAt',
             flowSessions: 'chatId, status, updatedAt',
+        })
+
+        this.version(3).stores({
+            rooms: 'id, createdAt',
+            chats: 'id, roomId, createdAt',
+            messages: 'id, chatId, createdAt',
+            flowSessions: 'chatId, status, updatedAt',
+            profilings: 'id, chatId, userScopeId, aliasNormalized, status, updatedAt',
+            profilingResponses: 'id, profilingId, phase, roundNumber, statementId',
+            profilingTextBlocks: 'id, key, version, active',
         })
     }
 }

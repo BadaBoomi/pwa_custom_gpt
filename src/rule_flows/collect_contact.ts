@@ -14,7 +14,7 @@ function runningReply(session: FlowSession, assistantReply: string): FlowHandlin
 }
 
 const collectContactFlow: RuleFlowHandler = {
-    getInitialPrompt(flowType: string): string {
+    getInitialPrompt(flowType: string, _session: FlowSession): string {
         if (flowType !== DEFAULT_RULE_FLOW_TYPE) {
             return 'Deterministic flow started. Please tell me your name.'
         }

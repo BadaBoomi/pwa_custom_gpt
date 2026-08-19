@@ -9,6 +9,6 @@ export interface FlowHandlingResult {
 }
 
 export interface RuleFlowHandler {
-    getInitialPrompt(flowType: string): string
-    handleTurn(session: FlowSession, userInput: string): FlowHandlingResult
+    getInitialPrompt(flowType: string, session: FlowSession): Promise<string> | string
+    handleTurn(session: FlowSession, userInput: string): Promise<FlowHandlingResult> | FlowHandlingResult
 }
