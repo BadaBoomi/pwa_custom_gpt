@@ -24,7 +24,9 @@ pwa_custom_gpt ist die lokale, offline-fähige PWA-Neuimplementierung von a_cust
 5. [Authentisierung](#authentisierung)
 6. [Konfiguration von Starters](#konfiguration-von-starters)
 7. [Nutzung](#nutzung)
-8. [Lizenz](#lizenz)
+8. [Rule Flows](#rule-flows)
+9. [Konfiguration](#konfiguration)
+10. [Lizenz](#lizenz)
 
 ## Installation
 
@@ -156,6 +158,149 @@ Die App ist bewusst local-first ausgelegt. Wichtige Daten werden im Browser gesp
 - API-Zugriffe sind ausschließlich für OpenAI-Requests vorgesehen und getrennt von der lokalen Persistenz.
 - Schema-Migrationen werden in der IndexedDB-Schicht versioniert.
 - Für die PWA-Tests ist der Production-Preview die verlässlichste Variante, weil dort Manifest und Service Worker wie im echten Build aktiv sind.
+
+## Rule Flows
+
+Rule Flows sind deterministische, schrittweise Dialogabläufe, die die normale AI-Antwortlogik zeitweise übernehmen. Die Flows sind modular aufgebaut und werden über den Flow-Namen auf ein Skript im Projekt gemappt.
+
+### Zweck
+
+- Trennung von freier AI-Konversation und strengem, validierbarem Ablauf
+- Wiederverwendbare, versionierbare Flow-Module
+- Kontrollierte Zustandsmaschine pro Chat mit Persistenz in IndexedDB
+
+### Architekturüberblick
+
+- Parsing und Session-Erstellung: `src/flows/ruleFlowEngine.ts`
+- Handler-Vertrag (Interface): `src/flows/flowTypes.ts`
+- Modul-Registry und Auflösung: `src/flows/flowRegistry.ts`
+- Konkrete Flow-Skripte: `src/rule_flows/*.ts`
+- Orchestrierung im Chat-Lebenszyklus: `src/repositories/chatRepository.ts`
+
+### Trigger-Formate
+
+Rule Flows können durch Assistant-Ausgaben gestartet werden.
+
+1. Token-Format (Textantwort)
+	 - Unterstützt: `[[start_rule_flow:flow_name]]`
+	 - Wichtig: Ohne `:flow_name` wird der Token nicht mehr als Trigger erkannt.
+
+2. JSON-basierte Direktiven (führendes JSON-Objekt)
+	 - `start_rule_flow`-Objekt
+	 - `tool: "start_rule_flow"`
+	 - `function_call.name: "start_rule_flow"`
+
+Hinweis: Beim JSON-Format kann bei fehlendem `flowType` aktuell ein Fallback auf den Default-Flow greifen. Für eindeutiges Verhalten sollte `flowType` immer explizit gesetzt werden.
+
+### Wie ein Flow aufgelöst wird
+
+1. Die App extrahiert `flowType` aus der Assistant-Antwort.
+2. Es wird eine Flow-Session für den Chat angelegt.
+3. Die Registry sucht ein Modul gleichen Namens unter `src/rule_flows`.
+4. Existiert ein Handler, übernimmt er Initial-Prompt und Folgeturns.
+5. Existiert kein Handler, wird eine Assistant-Fehlermeldung gespeichert und der deterministische Modus beendet.
+
+### Benennung und Konventionen
+
+- Dateiname entspricht `flowType`:
+	- Beispiel: `flowType = "collect_contact"` -> Datei `src/rule_flows/collect_contact.ts`
+- Erlaubte Zeichen im Token-Flow-Namen: `a-z`, `0-9`, `_`, `-`
+- Empfehlung: ausschließlich lowercase verwenden
+
+### Handler-Vertrag
+
+Jedes Flow-Modul exportiert einen Default-Handler mit zwei Methoden:
+
+- `getInitialPrompt(flowType)`
+	- Liefert den Starttext, der nach Aktivierung des Flows in den Chat geschrieben wird.
+- `handleTurn(session, userInput)`
+	- Verarbeitet den nächsten Nutzereingang deterministisch und liefert:
+		- `nextStep`
+		- `status` (`running`, `completed`, `aborted`)
+		- `answers`
+		- `assistantReply`
+		- optional `resultSummary`
+
+### Beispiel: Neuer Flow
+
+Datei anlegen: `src/rule_flows/lead_capture.ts`
+
+```ts
+import type { RuleFlowHandler } from '@/flows/flowTypes'
+
+const leadCaptureFlow: RuleFlowHandler = {
+		getInitialPrompt() {
+				return 'Lead Flow gestartet. Wie lautet Ihr Name?'
+		},
+
+		handleTurn(session, userInput) {
+				const input = userInput.trim()
+				if (!input) {
+						return {
+								nextStep: session.currentStep,
+								status: 'running',
+								answers: session.answers,
+								assistantReply: 'Bitte geben Sie einen Wert ein.',
+						}
+				}
+
+				return {
+						nextStep: 'done',
+						status: 'completed',
+						answers: { ...session.answers, name: input },
+						assistantReply: 'Danke. Lead wurde erfasst.',
+						resultSummary: `name=${input}`,
+				}
+		},
+}
+
+export default leadCaptureFlow
+```
+
+Danach kann der Flow mit folgendem Token gestartet werden:
+
+```text
+[[start_rule_flow:lead_capture]]
+```
+
+### Laufzeitverhalten
+
+- Solange eine Flow-Session den Status `running` hat, verarbeitet der Flow-Handler die Nutzereingaben.
+- Bei `completed` wird die Session entfernt und der normale AI-Modus fortgesetzt.
+- Bei fehlendem Skript wird der Flow abgebrochen und eine sichtbare Hinweisnachricht im Chat hinterlegt.
+
+### Persistenz
+
+Flow-Sessions werden in IndexedDB in der Tabelle `flowSessions` gespeichert. Persistiert werden unter anderem:
+
+- `chatId`, `flowId`, `flowType`
+- `currentStep`, `answers`
+- `status`, optional `resultSummary`
+- `createdAt`, `updatedAt`
+
+Dadurch kann ein laufender Flow nach Reload der App fortgesetzt werden.
+
+### Konfiguration und Erweiterung
+
+- Kein zentraler Registry-Eintrag pro Flow notwendig: die Modulauflösung erfolgt automatisch über die Dateien in `src/rule_flows`.
+- Für neue Flows reicht ein neues Modul im richtigen Dateinamen.
+- Für konsistentes Verhalten sollten Flows:
+	- Input trimmen und validieren
+	- auf ungültige Zustände robust reagieren
+	- klare, nutzerfreundliche Antworten liefern
+
+### Troubleshooting
+
+- Flow startet nicht:
+	- Prüfen, ob Token exakt `[[start_rule_flow:flow_name]]` lautet.
+	- Prüfen, ob Dateiname in `src/rule_flows` exakt dem `flow_name` entspricht.
+
+- Unerwartet falscher Flow:
+	- Prüfen, ob JSON-Direktiven ohne `flowType` gesendet wurden (können auf Default fallen).
+
+- Build-Fehler nach neuem Flow:
+	- Typen gegen `RuleFlowHandler` prüfen.
+	- `npm run build` ausführen.
 
 ## Lizenz
 
