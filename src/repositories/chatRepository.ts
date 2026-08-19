@@ -6,7 +6,8 @@ import { getRuleFlowHandler } from '@/flows/flowRegistry'
 import { createInitialFlowSession, parseRuleFlowDirective } from '@/flows/ruleFlowEngine'
 import { openAiService, getTextContent } from '@/services/openAiService'
 import { settingsRepository } from '@/repositories/settingsRepository'
-import { splitAssistantResponse } from '@/utils/messageUtils'
+import { applyRoomAttributeDirectives, splitAssistantResponse } from '@/utils/messageUtils'
+import { normalizeRoomCustomAttributes } from '@/utils/roomUtils'
 
 function uuid(): string {
     return crypto.randomUUID()
@@ -60,7 +61,7 @@ export const chatRepository = {
     },
 
     async createRoom(name: string): Promise<Room> {
-        const room: Room = { id: uuid(), name, createdAt: Date.now() }
+        const room: Room = { id: uuid(), name, customAttributes: {}, createdAt: Date.now() }
         await db.rooms.add(room)
         return room
     },
@@ -218,6 +219,9 @@ export const chatRepository = {
         const now = Date.now()
         const newMessages: Message[] = []
         let requestedFlowType: string | null = null
+        const room = await db.rooms.get(chat.roomId)
+        let roomCustomAttributes = normalizeRoomCustomAttributes(room?.customAttributes)
+        let didUpdateRoomAttributes = false
 
         response.output
             .filter((item) => item.type === 'message' && item.role === 'assistant')
@@ -225,12 +229,16 @@ export const chatRepository = {
                 const rawText = getTextContent(item)
                 const directive = parseRuleFlowDirective(rawText)
                 const contentForDisplay = directive ? directive.cleanedText : rawText
+                const attributeResult = applyRoomAttributeDirectives(contentForDisplay, roomCustomAttributes)
 
                 if (directive && !requestedFlowType) {
                     requestedFlowType = directive.flowType
                 }
 
-                const parts = splitAssistantResponse(contentForDisplay)
+                roomCustomAttributes = attributeResult.customAttributes
+                didUpdateRoomAttributes = didUpdateRoomAttributes || attributeResult.didUpdateAttributes
+
+                const parts = splitAssistantResponse(attributeResult.cleanedText)
                 parts.forEach((part, partIndex) => {
                     if (!part.trim()) return
                     newMessages.push({
@@ -242,6 +250,10 @@ export const chatRepository = {
                     })
                 })
             })
+
+        if (room && didUpdateRoomAttributes) {
+            await db.rooms.update(room.id, { customAttributes: roomCustomAttributes })
+        }
 
         if (newMessages.length > 0) {
             await db.messages.bulkAdd(newMessages)

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { chatRepository } from '@/repositories/chatRepository'
 import { settingsRepository } from '@/repositories/settingsRepository'
 import { extractInlineResponseButtons, parseStarterPrompts } from '@/utils/messageUtils'
+import { formatRoomLabel } from '@/utils/roomUtils'
 import type { Chat, Message } from '@/db/db'
 
 interface ConfigurationEntry {
@@ -53,27 +54,22 @@ export function useConversation(chatId: string) {
         error: null,
     })
 
-    const loadMessages = useCallback(async () => {
-        const messages = await chatRepository.getMessagesForChat(chatId)
-        setState((s) => ({ ...s, messages }))
-    }, [chatId])
+    const loadConversationSnapshot = useCallback(async () => {
+        const [chat, messages, activeFlow, rooms] = await Promise.all([
+            chatRepository.getChatById(chatId),
+            chatRepository.getMessagesForChat(chatId),
+            chatRepository.getActiveFlowForChat(chatId),
+            chatRepository.getAllRooms(),
+        ])
 
-    const loadActiveFlow = useCallback(async () => {
-        const activeFlow = await chatRepository.getActiveFlowForChat(chatId)
-        setState((s) => ({ ...s, activeFlow }))
+        const roomName = chat ? formatRoomLabel(rooms.find((room) => room.id === chat.roomId)) : ''
+        return { chat: chat ?? null, messages, activeFlow, roomName }
     }, [chatId])
 
     useEffect(() => {
         const init = async () => {
             try {
-                const chat = await chatRepository.getChatById(chatId)
-                let roomName = ''
-                if (chat) {
-                    const rooms = await chatRepository.getAllRooms()
-                    roomName = rooms.find((r) => r.id === chat.roomId)?.name ?? ''
-                }
-                const messages = await chatRepository.getMessagesForChat(chatId)
-                const activeFlow = await chatRepository.getActiveFlowForChat(chatId)
+                const { chat, messages, activeFlow, roomName } = await loadConversationSnapshot()
                 const configurationEntries = parseStarterPrompts(settingsRepository.getStarters() ?? '')
 
                 const persisted = localStorage.getItem(`${SELECTED_CONFIG_STORAGE_PREFIX}${chatId}`)
@@ -107,7 +103,7 @@ export function useConversation(chatId: string) {
             }
         }
         void init()
-    }, [chatId])
+    }, [chatId, loadConversationSnapshot])
 
     const onInputChange = useCallback((text: string) => {
         setState((s) => ({ ...s, inputText: text }))
@@ -153,13 +149,14 @@ export function useConversation(chatId: string) {
 
         try {
             await chatRepository.sendMessage(chat, text, promptId, vectorStoreIds)
-            await Promise.all([loadMessages(), loadActiveFlow()])
+            const snapshot = await loadConversationSnapshot()
+            setState((s) => ({ ...s, ...snapshot }))
         } catch (e) {
             setState((s) => ({ ...s, error: String(e) }))
         } finally {
             setState((s) => ({ ...s, isLoading: false }))
         }
-    }, [state.chat, state.inputText, state.selectedConfiguration, loadActiveFlow, loadMessages])
+    }, [state.chat, state.inputText, state.selectedConfiguration, loadConversationSnapshot])
 
     const { displayMessages, responseButtons } = useMemo(() => {
         const displayMessages: Message[] = []

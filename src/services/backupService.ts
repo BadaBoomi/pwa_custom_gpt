@@ -3,6 +3,7 @@
 
 import { db, type Chat, type FlowSession, type Message, type Room } from '@/db/db'
 import { settingsRepository } from '@/repositories/settingsRepository'
+import { normalizeRoomCustomAttributes } from '@/utils/roomUtils'
 
 const BACKUP_VERSION = 1
 
@@ -56,7 +57,7 @@ async function computeContentSignature(): Promise<string> {
         db.flowSessions.toArray(),
     ])
     return JSON.stringify({
-        rooms: rooms.map((r) => r.id + r.name + r.createdAt),
+        rooms: rooms.map((r) => r.id + r.name + JSON.stringify(normalizeRoomCustomAttributes(r.customAttributes)) + r.createdAt),
         chats: chats.map((c) => c.id + c.roomId + c.name + c.threadId + c.createdAt),
         messages: messages.map((m) => m.id + m.chatId + m.role + m.content + m.createdAt),
         flowSessions: flowSessions.map((f) => f.chatId + f.status + f.currentStep + f.updatedAt),
@@ -173,6 +174,15 @@ function validatePayload(raw: unknown): BackupPayload {
     if (!Array.isArray(obj.selectedConfigs)) {
         obj.selectedConfigs = []
     }
+
+    obj.rooms = (obj.rooms as unknown[]).map((room) => {
+        if (!room || typeof room !== 'object') return room
+        const typedRoom = room as Room
+        return {
+            ...typedRoom,
+            customAttributes: normalizeRoomCustomAttributes(typedRoom.customAttributes),
+        }
+    })
 
     return obj as unknown as BackupPayload
 }
