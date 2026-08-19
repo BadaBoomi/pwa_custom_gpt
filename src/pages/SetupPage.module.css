@@ -61,3 +61,60 @@ h1 {
 .saveBtn:hover {
     background: #4070e0;
 }
+
+.importSection {
+    border-top: 1px solid #2a2a2a;
+    padding-top: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.7rem;
+}
+
+.importTitle {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #e7e7e7;
+}
+
+.importHint {
+    color: #aaa;
+    font-size: 0.9rem;
+}
+
+.importWarning {
+    font-size: 0.82rem;
+    color: #ffb86b;
+    background: #2a1a0a;
+    border: 1px solid #5a3a0a;
+    border-radius: 6px;
+    padding: 0.45rem 0.65rem;
+}
+
+.importBtn {
+    background: #222f5a;
+    color: #dce7ff;
+    border: 1px solid #3554aa;
+    border-radius: 8px;
+    padding: 0.5rem 0.85rem;
+    font-size: 0.9rem;
+    align-self: flex-start;
+}
+
+.importBtn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.hiddenInput {
+    display: none;
+}
+
+.backupError {
+    color: #ff8f8f;
+    font-size: 0.85rem;
+}
+
+.backupSuccess {
+    color: #6bffb8;
+    font-size: 0.85rem;
+}
