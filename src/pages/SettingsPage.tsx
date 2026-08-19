@@ -1,4 +1,5 @@
 // Entspricht Android: SettingsScreen + SettingsViewModel
+import { useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSettings } from '@/hooks/useSettings'
 import styles from './SettingsPage.module.css'
@@ -12,12 +13,26 @@ export default function SettingsPage() {
         onUserIdChange,
         onSave,
         reloadConfiguration,
+        onExportBackup,
+        onImportBackup,
     } =
         useSettings()
     const navigate = useNavigate()
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     function handleSave() {
         onSave()
+    }
+
+    function handleImportClick() {
+        fileInputRef.current?.click()
+    }
+
+    function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0]
+        if (file) void onImportBackup(file)
+        // Reset so the same file can be re-selected if needed
+        e.target.value = ''
     }
 
     return (
@@ -78,6 +93,51 @@ export default function SettingsPage() {
             </button>
 
             {state.isSaved && <p className={styles.saved}>✓ Gespeichert</p>}
+
+            {/* ── Backup section ─────────────────────────────────────── */}
+            <section className={styles.backupSection}>
+                <h2 className={styles.backupTitle}>Backup</h2>
+
+                <div className={styles.backupIndicators}>
+                    <span className={state.configBackedUp ? styles.badgeSaved : styles.badgeUnsaved}>
+                        {state.configBackedUp ? '✓ Konfiguration gesichert' : '⚠ Konfiguration nicht gesichert'}
+                    </span>
+                    <span className={state.contentBackedUp ? styles.badgeSaved : styles.badgeUnsaved}>
+                        {state.contentBackedUp ? '✓ Räume & Dialoge gesichert' : '⚠ Räume & Dialoge nicht gesichert'}
+                    </span>
+                </div>
+
+                <p className={styles.backupWarning}>
+                    ⚠ Beim Importieren werden alle lokalen Daten ersetzt. Der API-Schlüssel wird nicht gesichert.
+                </p>
+
+                <div className={styles.backupActions}>
+                    <button
+                        className={styles.backupBtn}
+                        onClick={() => void onExportBackup()}
+                        disabled={state.isExporting || state.isImporting}
+                    >
+                        {state.isExporting ? 'Exportiere...' : '⬇ Backup exportieren'}
+                    </button>
+                    <button
+                        className={styles.backupBtn}
+                        onClick={handleImportClick}
+                        disabled={state.isExporting || state.isImporting}
+                    >
+                        {state.isImporting ? 'Importiere...' : '⬆ Backup importieren'}
+                    </button>
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="application/json"
+                        className={styles.hiddenInput}
+                        onChange={handleFileChange}
+                    />
+                </div>
+
+                {state.backupError && <p className={styles.backupError}>{state.backupError}</p>}
+                {state.backupSuccess && <p className={styles.backupSuccess}>{state.backupSuccess}</p>}
+            </section>
 
             <section className={styles.configSection}>
                 <div className={styles.configHeader}>

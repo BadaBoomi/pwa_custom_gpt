@@ -1,8 +1,14 @@
 // Entspricht Android: SetupViewModel + SettingsViewModel
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { settingsRepository } from '@/repositories/settingsRepository'
 import { openAiService, getTextContent } from '@/services/openAiService'
 import { parseStarterPrompts } from '@/utils/messageUtils'
+import {
+    exportBackup,
+    importBackup,
+    isConfigSaved,
+    isContentSaved,
+} from '@/services/backupService'
 
 interface ConfigurationPrompt {
     label: string
@@ -21,6 +27,13 @@ export interface SettingsState {
     configurationPrompts: ConfigurationPrompt[]
     isConfigurationLoading: boolean
     configurationError: string | null
+    // Backup
+    isExporting: boolean
+    isImporting: boolean
+    backupError: string | null
+    backupSuccess: string | null
+    configBackedUp: boolean
+    contentBackedUp: boolean
 }
 
 function initialState(): SettingsState {
@@ -37,6 +50,12 @@ function initialState(): SettingsState {
         configurationPrompts: parseStarterPrompts(startersMd),
         isConfigurationLoading: false,
         configurationError: null,
+        isExporting: false,
+        isImporting: false,
+        backupError: null,
+        backupSuccess: null,
+        configBackedUp: isConfigSaved(),
+        contentBackedUp: false,
     }
 }
 
@@ -102,6 +121,21 @@ function parseConfigurationPrompts(rawText: string): ConfigurationPrompt[] {
 export function useSettings() {
     const [state, setState] = useState<SettingsState>(initialState)
 
+    // Init async freshness check (content)
+    useEffect(() => {
+        isContentSaved().then((saved) => {
+            setState((s) => ({ ...s, contentBackedUp: saved }))
+        })
+    }, [])
+
+    const refreshFreshness = useCallback(async () => {
+        const [cfgSaved, cntSaved] = await Promise.all([
+            Promise.resolve(isConfigSaved()),
+            isContentSaved(),
+        ])
+        setState((s) => ({ ...s, configBackedUp: cfgSaved, contentBackedUp: cntSaved }))
+    }, [])
+
     const onApiKeyChange = useCallback((value: string) => {
         const cleaned = value.split('\n').map((l) => l.trim()).filter(Boolean).join('')
         setState((s) => ({ ...s, apiKey: cleaned, apiKeyError: null, isSaved: false }))
@@ -136,7 +170,7 @@ export function useSettings() {
         settingsRepository.savePromptId(s.promptId.trim())
         settingsRepository.saveVectorStoreIds(parsedVsIds)
         if (s.userId.trim()) settingsRepository.saveUserEmail(s.userId.trim())
-        setState((prev) => ({ ...prev, isSaved: true, apiKeyError: null, promptIdError: null }))
+        setState((prev) => ({ ...prev, isSaved: true, apiKeyError: null, promptIdError: null, configBackedUp: isConfigSaved() }))
         return true
     }, [state])
 
@@ -175,7 +209,8 @@ export function useSettings() {
                 isConfigurationLoading: false,
                 configurationError: null,
             }))
-        } catch (e) {
+            await refreshFreshness()
+    } catch (e) {
             setState((prev) => ({
                 ...prev,
                 isConfigurationLoading: false,
@@ -183,6 +218,49 @@ export function useSettings() {
             }))
         }
     }, [state.promptId, state.vectorStoreIds, state.userId])
+
+    const onExportBackup = useCallback(async () => {
+        setState((s) => ({ ...s, isExporting: true, backupError: null, backupSuccess: null }))
+        try {
+            await exportBackup()
+            setState((s) => ({
+                ...s,
+                isExporting: false,
+                backupSuccess: 'Backup erfolgreich exportiert',
+                configBackedUp: true,
+                contentBackedUp: true,
+            }))
+        } catch (e) {
+            setState((s) => ({
+                ...s,
+                isExporting: false,
+                backupError: e instanceof Error ? e.message : 'Export fehlgeschlagen',
+            }))
+        }
+    }, [])
+
+    const onImportBackup = useCallback(async (file: File) => {
+        setState((s) => ({ ...s, isImporting: true, backupError: null, backupSuccess: null }))
+        try {
+            await importBackup(file)
+            setState((s) => ({
+                ...s,
+                isImporting: false,
+                backupSuccess: 'Backup erfolgreich importiert. Die App wird neu geladen...',
+                configBackedUp: true,
+                contentBackedUp: true,
+            }))
+            // Full reload for clean state rehydration after import
+            const RELOAD_DELAY_MS = 1200
+            setTimeout(() => window.location.reload(), RELOAD_DELAY_MS)
+        } catch (e) {
+            setState((s) => ({
+                ...s,
+                isImporting: false,
+                backupError: e instanceof Error ? e.message : 'Import fehlgeschlagen',
+            }))
+        }
+    }, [])
 
     return {
         state,
@@ -192,5 +270,7 @@ export function useSettings() {
         onUserIdChange,
         onSave,
         reloadConfiguration,
+        onExportBackup,
+        onImportBackup,
     }
 }
