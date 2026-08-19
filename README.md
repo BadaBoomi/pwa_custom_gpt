@@ -2,7 +2,7 @@
 
 ## Projektbeschreibung
 
-pwa_custom_gpt ist die lokale, offline-fähige PWA-Neuimplementierung von a_custom_gpt. Die App bildet die fachliche Logik der Android-Version nach, speichert alle Nutzerdaten local-first auf dem Gerät und nutzt IndexedDB für Räume, Konversationen, Nachrichten und Einstellungen.
+pwa_custom_gpt ist eine lokale, offline-fähiger PWA-Applikation für GPT-basierte KI-Assistenten. Sie ermöglicht es, verschiedene Assistenten-IDs und API-Keys zu hinterlegen und bietet eine übersichtliche Chat- und Raumverwaltung, speichert alle Nutzerdaten local-first auf dem Gerät und nutzt IndexedDB für Räume, Konversationen, Nachrichten und Einstellungen.
 
 ## Features
 
