@@ -8,18 +8,9 @@ export interface RuleFlowDirective {
     cleanedText: string
 }
 
-interface FlowHandlingResult {
-    nextStep: string
-    status: FlowSession['status']
-    answers: Record<string, string>
-    assistantReply: string
-    resultSummary?: string
-}
+const TRIGGER_TOKEN_REGEX = /\[\[start_rule_flow:([a-z0-9_\-]+)\]\]/i
 
-const TRIGGER_TOKEN_REGEX = /\[\[start_rule_flow(?::([a-z0-9_\-]+))?\]\]/i
-const EMAIL_OR_PHONE = new Set(['email', 'phone'])
-
-function normalizeFlowType(value: unknown): string {
+export function normalizeFlowType(value: unknown): string {
     if (typeof value === 'string' && value.trim()) {
         return value.trim().toLowerCase()
     }
@@ -132,101 +123,5 @@ export function createInitialFlowSession(chatId: string, flowType: string): Flow
         answers: {},
         createdAt: now,
         updatedAt: now,
-    }
-}
-
-export function getInitialPrompt(flowType: string): string {
-    const normalized = normalizeFlowType(flowType)
-    if (normalized !== DEFAULT_RULE_FLOW_TYPE) {
-        return 'Deterministic flow started. Please tell me your name.'
-    }
-    return 'Deterministic flow started. What is your name?'
-}
-
-export function handleFlowTurn(session: FlowSession, userInput: string): FlowHandlingResult {
-    const input = userInput.trim()
-
-    if (!input) {
-        return {
-            nextStep: session.currentStep,
-            status: 'running',
-            answers: session.answers,
-            assistantReply: 'Please provide a value so we can continue.',
-        }
-    }
-
-    if (session.currentStep === 'ask_name') {
-        if (input.length < 2) {
-            return {
-                nextStep: 'ask_name',
-                status: 'running',
-                answers: session.answers,
-                assistantReply: 'Please enter a name with at least 2 characters.',
-            }
-        }
-
-        return {
-            nextStep: 'ask_contact_method',
-            status: 'running',
-            answers: { ...session.answers, name: input },
-            assistantReply: 'Preferred contact method: email or phone?',
-        }
-    }
-
-    if (session.currentStep === 'ask_contact_method') {
-        const method = input.toLowerCase()
-        if (!EMAIL_OR_PHONE.has(method)) {
-            return {
-                nextStep: 'ask_contact_method',
-                status: 'running',
-                answers: session.answers,
-                assistantReply: 'Please reply with exactly "email" or "phone".',
-            }
-        }
-
-        const answers: Record<string, string> = { ...session.answers, contactMethod: method }
-        return {
-            nextStep: 'confirm',
-            status: 'running',
-            answers,
-            assistantReply: `Confirm: name=${answers.name}, contact=${answers.contactMethod}. Reply yes or no.`,
-        }
-    }
-
-    if (session.currentStep === 'confirm') {
-        const answer = input.toLowerCase()
-        if (answer === 'yes') {
-            const resultSummary = `name=${session.answers.name ?? ''}; contact=${session.answers.contactMethod ?? ''}`
-            return {
-                nextStep: 'confirm',
-                status: 'completed',
-                answers: session.answers,
-                resultSummary,
-                assistantReply: 'Saved. Deterministic flow completed. AI mode resumed.',
-            }
-        }
-
-        if (answer === 'no') {
-            return {
-                nextStep: 'ask_name',
-                status: 'running',
-                answers: {},
-                assistantReply: 'Okay, let us restart. What is your name?',
-            }
-        }
-
-        return {
-            nextStep: 'confirm',
-            status: 'running',
-            answers: session.answers,
-            assistantReply: 'Please answer with yes or no.',
-        }
-    }
-
-    return {
-        nextStep: 'ask_name',
-        status: 'running',
-        answers: {},
-        assistantReply: 'Flow state was reset. What is your name?',
     }
 }
