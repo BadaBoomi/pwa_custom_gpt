@@ -33,6 +33,49 @@ export function splitAssistantResponse(text: string): string[] {
     return result
 }
 
+export interface InlineResponseButton {
+    label: string
+    content: string
+}
+
+export function extractInlineResponseButtons(text: string): {
+    cleanedText: string
+    buttons: InlineResponseButton[]
+} {
+    const pattern = /\[\[buttons:\s*([\s\S]*?)\]\]/gi
+    const matches = Array.from(text.matchAll(pattern))
+    if (matches.length === 0) {
+        return { cleanedText: text, buttons: [] }
+    }
+
+    let parsedButtons: InlineResponseButton[] = []
+
+    for (const match of matches) {
+        const body = match[1] ?? ''
+        const entryPattern = /\[\s*([^|\]]+?)\s*\|\s*([^\]]*?)\s*\]/g
+        const entries = Array.from(body.matchAll(entryPattern))
+            .map((entry) => ({
+                label: (entry[1] ?? '').trim(),
+                content: (entry[2] ?? '').trim(),
+            }))
+            .filter((entry) => entry.label && entry.content)
+
+        if (entries.length > 0) {
+            parsedButtons = entries
+        }
+    }
+
+    const cleanedText = text
+        .replace(pattern, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+
+    return {
+        cleanedText,
+        buttons: parsedButtons,
+    }
+}
+
 /**
  * Extrahiert ein führendes JSON-Objekt inkl. Resttext durch einfache Klammerzählung.
  * Entspricht Android: ChatRepositoryImpl.extractLeadingJsonObject
