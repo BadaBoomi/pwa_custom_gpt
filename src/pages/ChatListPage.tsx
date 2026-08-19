@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useChats } from '@/hooks/useChats'
 import type { Chat } from '@/db/db'
+import { formatRoomLabel } from '@/utils/roomUtils'
 import styles from './ChatListPage.module.css'
 
 export default function ChatListPage() {
@@ -88,7 +89,7 @@ export default function ChatListPage() {
                                                 setMovingChat(null)
                                             }}
                                         >
-                                            {r.name}
+                                            {formatRoomLabel(r)}
                                         </button>
                                     ))}
                                     <button onClick={() => setMovingChat(null)}>✕</button>

@@ -6,7 +6,8 @@ import { getRuleFlowHandler } from '@/flows/flowRegistry'
 import { createInitialFlowSession, parseRuleFlowDirective } from '@/flows/ruleFlowEngine'
 import { openAiService, getTextContent } from '@/services/openAiService'
 import { settingsRepository } from '@/repositories/settingsRepository'
-import { splitAssistantResponse } from '@/utils/messageUtils'
+import { applyRoomAttributeDirectives, splitAssistantResponse } from '@/utils/messageUtils'
+import { normalizeRoomCustomAttributes } from '@/utils/roomUtils'
 
 function uuid(): string {
     return crypto.randomUUID()
@@ -59,8 +60,12 @@ export const chatRepository = {
         return db.rooms.orderBy('createdAt').reverse().toArray()
     },
 
+    async getRoomById(roomId: string): Promise<Room | undefined> {
+        return db.rooms.get(roomId)
+    },
+
     async createRoom(name: string): Promise<Room> {
-        const room: Room = { id: uuid(), name, createdAt: Date.now() }
+        const room: Room = { id: uuid(), name, customAttributes: {}, createdAt: Date.now() }
         await db.rooms.add(room)
         return room
     },
@@ -218,30 +223,42 @@ export const chatRepository = {
         const now = Date.now()
         const newMessages: Message[] = []
         let requestedFlowType: string | null = null
+        const room = await db.rooms.get(chat.roomId)
+        let roomCustomAttributes = normalizeRoomCustomAttributes(room?.customAttributes)
+        let didUpdateRoomAttributes = false
 
-        response.output
+        const assistantMessages = response.output
             .filter((item) => item.type === 'message' && item.role === 'assistant')
-            .forEach((item, msgIndex) => {
-                const rawText = getTextContent(item)
-                const directive = parseRuleFlowDirective(rawText)
-                const contentForDisplay = directive ? directive.cleanedText : rawText
 
-                if (directive && !requestedFlowType) {
-                    requestedFlowType = directive.flowType
-                }
+        for (const [msgIndex, item] of assistantMessages.entries()) {
+            const rawText = getTextContent(item)
+            const attributeResult = applyRoomAttributeDirectives(rawText, roomCustomAttributes)
+            const directive = parseRuleFlowDirective(attributeResult.cleanedText)
+            const contentForDisplay = directive ? directive.cleanedText : attributeResult.cleanedText
 
-                const parts = splitAssistantResponse(contentForDisplay)
-                parts.forEach((part, partIndex) => {
-                    if (!part.trim()) return
-                    newMessages.push({
-                        id: partIndex === 0 ? item.id : `${item.id}_${partIndex}`,
-                        chatId: chat.id,
-                        role: 'assistant',
-                        content: part,
-                        createdAt: now + msgIndex * 10 + partIndex,
-                    })
+            if (directive && !requestedFlowType) {
+                requestedFlowType = directive.flowType
+            }
+
+            roomCustomAttributes = attributeResult.customAttributes
+            didUpdateRoomAttributes = didUpdateRoomAttributes || attributeResult.didUpdateAttributes
+
+            const parts = splitAssistantResponse(contentForDisplay)
+            parts.forEach((part, partIndex) => {
+                if (!part.trim()) return
+                newMessages.push({
+                    id: partIndex === 0 ? item.id : `${item.id}_${partIndex}`,
+                    chatId: chat.id,
+                    role: 'assistant',
+                    content: part,
+                    createdAt: now + msgIndex * 10 + partIndex,
                 })
             })
+        }
+
+        if (room && didUpdateRoomAttributes) {
+            await db.rooms.update(room.id, { customAttributes: roomCustomAttributes })
+        }
 
         if (newMessages.length > 0) {
             await db.messages.bulkAdd(newMessages)
