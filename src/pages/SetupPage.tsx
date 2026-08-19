@@ -1,16 +1,28 @@
 // Entspricht Android: SetupScreen + SetupViewModel
+import { useRef } from 'react'
 import { useSettings } from '@/hooks/useSettings'
 import { useNavigate } from 'react-router-dom'
 import styles from './SetupPage.module.css'
 
 export default function SetupPage() {
-    const { state, onApiKeyChange, onPromptIdChange, onVectorStoreIdsChange, onUserIdChange, onSave } =
+    const { state, onApiKeyChange, onPromptIdChange, onVectorStoreIdsChange, onUserIdChange, onSave, onImportBackup } =
         useSettings()
     const navigate = useNavigate()
+    const fileInputRef = useRef<HTMLInputElement>(null)
 
     function handleSave() {
         const ok = onSave()
         if (ok) navigate('/rooms', { replace: true })
+    }
+
+    function handleImportClick() {
+        fileInputRef.current?.click()
+    }
+
+    function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+        const file = e.target.files?.[0]
+        if (file) void onImportBackup(file)
+        e.target.value = ''
     }
 
     return (
@@ -67,6 +79,32 @@ export default function SetupPage() {
             <button className={styles.saveBtn} onClick={handleSave}>
                 Speichern & starten
             </button>
+
+            <section className={styles.importSection}>
+                <h2 className={styles.importTitle}>Backup importieren</h2>
+                <p className={styles.importHint}>
+                    Du hast bereits ein Backup? Importiere es, um deine Konfiguration und Daten wiederherzustellen.
+                </p>
+                <p className={styles.importWarning}>
+                    ⚠ Beim Importieren werden alle lokalen Daten ersetzt. Der API-Schlüssel wird nicht gesichert.
+                </p>
+                <button
+                    className={styles.importBtn}
+                    onClick={handleImportClick}
+                    disabled={state.isImporting}
+                >
+                    {state.isImporting ? 'Importiere...' : <><span aria-hidden="true">⬆</span> Backup importieren</>}
+                </button>
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="application/json"
+                    className={styles.hiddenInput}
+                    onChange={handleFileChange}
+                />
+                {state.backupError && <p className={styles.backupError}>{state.backupError}</p>}
+                {state.backupSuccess && <p className={styles.backupSuccess}>{state.backupSuccess}</p>}
+            </section>
         </div>
     )
 }
