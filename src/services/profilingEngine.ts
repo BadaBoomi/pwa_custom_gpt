@@ -24,6 +24,23 @@ const OPTIONAL_CATEGORIES = [
     'Verhalten in der Abschlussphase',
 ]
 
+const ONE_TO_NINE_BUTTONS_TOKEN = '[[buttons:[1|1],[2|2],[3|3],[4|4],[5|5],[6|6],[7|7],[8|8],[9|9]]]'
+const ONE_TO_NINE_WITH_SKIP_BUTTONS_TOKEN = '[[buttons:[1|1],[2|2],[3|3],[4|4],[5|5],[6|6],[7|7],[8|8],[9|9],[skip|skip]]]'
+const ZERO_TO_FIVE_BUTTONS_TOKEN = '[[buttons:[0|0],[1|1],[2|2],[3|3],[4|4],[5|5]]]'
+const YES_NO_BUTTONS_TOKEN = '[[buttons:[ja|ja],[nein|nein]]]'
+const YES_BUTTONS_TOKEN = '[[buttons:[ja|ja]]]'
+const OPTIONAL_CATEGORY_BUTTONS_TOKEN = '[[buttons:[keine|keine],[alle|alle],[1|1],[2|2],[3|3]]]'
+
+function withButtons(text: string, token: string): string {
+    return `${text}\n${token}`
+}
+
+function buildMenuButtonsToken(profilingCount: number): string {
+    const numbered = Array.from({ length: profilingCount }, (_, idx) => `[${idx + 1}|${idx + 1}]`).join(',')
+    const parts = numbered ? `${numbered},[neu|neu]` : '[neu|neu]'
+    return `[[buttons:${parts}]]`
+}
+
 export interface RoundItem {
     statementId: number
     wwType: number
@@ -100,7 +117,8 @@ function categoryPrompt(alias: string, category: string, statements: Phase1State
         ? '\n\nAntworten Sie mit 1 bis 9 oder schreiben Sie "skip" zum Ueberspringen.'
         : '\n\nAntworten Sie mit einer Zahl von 1 bis 9.'
 
-    return `${header}\n\nAussagen:\n${lines.join('\n')}${suffix}`
+    const token = isOptional ? ONE_TO_NINE_WITH_SKIP_BUTTONS_TOKEN : ONE_TO_NINE_BUTTONS_TOKEN
+    return `${header}\n\nAussagen:\n${lines.join('\n')}${suffix}\n${token}`
 }
 
 function rankTypes(scores: Record<string, number>, mandatoryScores?: Record<string, number>): number[] {
@@ -259,7 +277,10 @@ export async function buildProfilingMenuPrompt(chatId: string): Promise<string> 
         })
         .join('\n')
 
-    return `${intro?.text ?? ''}\n\nProfiling-Uebersicht:\n${list}\n\nAntworten Sie mit der Nummer zum Fortsetzen oder mit "neu", um ein neues Profiling zu starten.`.trim()
+    return withButtons(
+        `${intro?.text ?? ''}\n\nProfiling-Uebersicht:\n${list}\n\nAntworten Sie mit der Nummer zum Fortsetzen oder mit "neu", um ein neues Profiling zu starten.`.trim(),
+        buildMenuButtonsToken(profilings.length),
+    )
 }
 
 export async function resolveMenuInput(chatId: string, input: string): Promise<MenuResolution> {
@@ -292,7 +313,10 @@ export async function resolveMenuInput(chatId: string, input: string): Promise<M
 
     return {
         type: 'menu',
-        assistantReply: 'Bitte antworten Sie mit "neu" oder mit der Nummer eines vorhandenen Profilings.',
+        assistantReply: withButtons(
+            'Bitte antworten Sie mit "neu" oder mit der Nummer eines vorhandenen Profilings.',
+            buildMenuButtonsToken(profilings.length),
+        ),
     }
 }
 
@@ -346,7 +370,10 @@ export async function createProfilingFromAlias(chatId: string, aliasInput: strin
     const confirmText = await getTextBlock('alias_confirm')
     return {
         profiling,
-        assistantReply: `Alias "${alias}" wurde angelegt.\n\nBitte bestaetigen Sie mit "ja":\n${confirmText?.text ?? ''}`.trim(),
+        assistantReply: withButtons(
+            `Alias "${alias}" wurde angelegt.\n\nBitte bestaetigen Sie mit "ja":\n${confirmText?.text ?? ''}`.trim(),
+            YES_BUTTONS_TOKEN,
+        ),
     }
 }
 
@@ -397,13 +424,13 @@ function buildPhase2StatementPrompt(state: ProfilingStateData): string {
     const item = currentRound.items[state.phase2CurrentItemIndex]
     if (!item) return 'Es wurde keine offene Aussage gefunden.'
 
-    return [
+    return withButtons([
         `Aussage ${state.phase2CurrentItemIndex + 1} von 9:`,
         '',
         item.statement,
         '',
         `Bitte bewerten Sie diese Aussage fuer ${state.alias} mit 0 bis 5.`,
-    ].join('\n')
+    ].join('\n'), ZERO_TO_FIVE_BUTTONS_TOKEN)
 }
 
 function parseScoreInput(input: string, min: number, max: number): number | null {
@@ -433,7 +460,7 @@ function buildIntermediateText(state: ProfilingStateData, roundNumber: number): 
     state.phase2MainType = main
     state.phase2SecondaryType = secondary
 
-    return [
+    return withButtons([
         `Zwischenergebnis nach Runde ${roundNumber}:`,
         '',
         `Aktueller Haupttyp: W&W-Typ ${main}`,
@@ -443,7 +470,7 @@ function buildIntermediateText(state: ProfilingStateData, roundNumber: number): 
         'Hinweis: Dies ist eine vertriebspraktische Arbeitshypothese und keine psychologische Diagnose.',
         '',
         'Moechten Sie mit einer weiteren Runde fortfahren? Antworten Sie mit "ja" oder "nein".',
-    ].join('\n')
+    ].join('\n'), YES_NO_BUTTONS_TOKEN)
 }
 
 async function initializePhase2Round(state: ProfilingStateData): Promise<void> {
@@ -476,7 +503,7 @@ export async function renderCurrentPrompt(profiling: Profiling): Promise<string>
 
     if (profiling.currentStepKey === 'alias_confirm') {
         const confirmText = await getTextBlock('alias_confirm')
-        return `Bitte bestaetigen Sie mit "ja":\n${confirmText?.text ?? ''}`.trim()
+        return withButtons(`Bitte bestaetigen Sie mit "ja":\n${confirmText?.text ?? ''}`.trim(), YES_BUTTONS_TOKEN)
     }
 
     if (profiling.currentStepKey === 'phase1_category') {
@@ -484,13 +511,19 @@ export async function renderCurrentPrompt(profiling: Profiling): Promise<string>
     }
 
     if (profiling.currentStepKey === 'phase1_optional_selection') {
-        return 'Die drei Pflichtkategorien sind abgeschlossen. Moechten Sie Zusatzkategorien bearbeiten? Antwortoptionen: "keine", "alle" oder Kombinationen wie "1 3".\n1. Welche Fragen werden gestellt\n2. Reaktion auf Ihre Einwaende\n3. Verhalten in der Abschlussphase'
+        return withButtons(
+            'Die drei Pflichtkategorien sind abgeschlossen. Moechten Sie Zusatzkategorien bearbeiten? Antwortoptionen: "keine", "alle" oder Kombinationen wie "1 3".\n1. Welche Fragen werden gestellt\n2. Reaktion auf Ihre Einwaende\n3. Verhalten in der Abschlussphase',
+            OPTIONAL_CATEGORY_BUTTONS_TOKEN,
+        )
     }
 
     if (profiling.currentStepKey === 'phase2_start_decision') {
         const mainType = state.phase1MainType ?? profiling.phase1MainType ?? 1
         const secondaryType = state.phase1SecondaryType ?? profiling.phase1SecondaryType ?? 2
-        return `${buildPhase1ResultText(state.alias, mainType, secondaryType)}\n\nMoechten Sie jetzt mit Phase 2 starten? Antworten Sie mit "ja" oder "nein".`
+        return withButtons(
+            `${buildPhase1ResultText(state.alias, mainType, secondaryType)}\n\nMoechten Sie jetzt mit Phase 2 starten? Antworten Sie mit "ja" oder "nein".`,
+            YES_NO_BUTTONS_TOKEN,
+        )
     }
 
     if (profiling.currentStepKey === 'phase2_statement') {
@@ -498,7 +531,7 @@ export async function renderCurrentPrompt(profiling: Profiling): Promise<string>
     }
 
     if (profiling.currentStepKey === 'phase2_continue_decision') {
-        return 'Moechten Sie mit einer weiteren Runde fortfahren? Antworten Sie mit "ja" oder "nein".'
+        return withButtons('Moechten Sie mit einer weiteren Runde fortfahren? Antworten Sie mit "ja" oder "nein".', YES_NO_BUTTONS_TOKEN)
     }
 
     if (profiling.currentStepKey === 'completed') {
@@ -515,7 +548,7 @@ export async function continueProfilingTurn(profiling: Profiling, userInput: str
     if (profiling.currentStepKey === 'alias_confirm') {
         if (input.toLowerCase() !== 'ja') {
             return {
-                reply: 'Bitte bestaetigen Sie mit "ja", um fortzufahren.',
+                reply: withButtons('Bitte bestaetigen Sie mit "ja", um fortzufahren.', YES_BUTTONS_TOKEN),
                 stateJson: profiling.stateJson,
                 stepKey: 'alias_confirm',
                 status: 'alias_created',
@@ -542,7 +575,10 @@ export async function continueProfilingTurn(profiling: Profiling, userInput: str
         const selected = parseOptionalCategorySelection(input)
         if (!selected) {
             return {
-                reply: 'Bitte antworten Sie mit "keine", "alle" oder mit einer Liste aus 1,2,3 fuer die Zusatzkategorien.',
+                reply: withButtons(
+                    'Bitte antworten Sie mit "keine", "alle" oder mit einer Liste aus 1,2,3 fuer die Zusatzkategorien.',
+                    OPTIONAL_CATEGORY_BUTTONS_TOKEN,
+                ),
                 stateJson: profiling.stateJson,
                 stepKey: 'phase1_optional_selection',
                 status: 'phase1_running',
@@ -562,7 +598,10 @@ export async function continueProfilingTurn(profiling: Profiling, userInput: str
             state.phase1SecondaryType = ranked[1]
 
             return {
-                reply: `${buildPhase1ResultText(state.alias, ranked[0], ranked[1])}\n\nMoechten Sie jetzt mit Phase 2 starten? Antworten Sie mit "ja" oder "nein".`,
+                reply: withButtons(
+                    `${buildPhase1ResultText(state.alias, ranked[0], ranked[1])}\n\nMoechten Sie jetzt mit Phase 2 starten? Antworten Sie mit "ja" oder "nein".`,
+                    YES_NO_BUTTONS_TOKEN,
+                ),
                 stateJson: stringifyState(state),
                 stepKey: 'phase2_start_decision',
                 status: 'phase1_done_phase2_not_started',
@@ -607,8 +646,8 @@ export async function continueProfilingTurn(profiling: Profiling, userInput: str
             if (pick === null) {
                 return {
                     reply: isOptional
-                        ? 'Ungueltige Eingabe. Antworten Sie mit 1 bis 9 oder mit "skip".'
-                        : 'Ungueltige Eingabe. Antworten Sie mit einer Zahl von 1 bis 9.',
+                        ? `Ungueltige Eingabe. Antworten Sie mit 1 bis 9 oder mit "skip".\n${ONE_TO_NINE_WITH_SKIP_BUTTONS_TOKEN}`
+                        : `Ungueltige Eingabe. Antworten Sie mit einer Zahl von 1 bis 9.\n${ONE_TO_NINE_BUTTONS_TOKEN}`,
                     stateJson: profiling.stateJson,
                     stepKey: 'phase1_category',
                     status: 'phase1_running',
@@ -619,7 +658,7 @@ export async function continueProfilingTurn(profiling: Profiling, userInput: str
             const selected = statements[pick - 1]
             if (!selected) {
                 return {
-                    reply: 'Ungueltige Auswahl. Bitte waehlen Sie eine Zahl zwischen 1 und 9.',
+                    reply: `Ungueltige Auswahl. Bitte waehlen Sie eine Zahl zwischen 1 und 9.\n${ONE_TO_NINE_BUTTONS_TOKEN}`,
                     stateJson: profiling.stateJson,
                     stepKey: 'phase1_category',
                     status: 'phase1_running',
@@ -652,7 +691,10 @@ export async function continueProfilingTurn(profiling: Profiling, userInput: str
         if (!state.optionalSelectionDone && state.currentCategoryIndex >= MANDATORY_CATEGORIES.length) {
             state.awaitingOptionalSelection = true
             return {
-                reply: 'Die drei Pflichtkategorien sind abgeschlossen. Moechten Sie Zusatzkategorien bearbeiten? Antwortoptionen: "keine", "alle" oder Kombinationen wie "1 3".\n1. Welche Fragen werden gestellt\n2. Reaktion auf Ihre Einwaende\n3. Verhalten in der Abschlussphase',
+                reply: withButtons(
+                    'Die drei Pflichtkategorien sind abgeschlossen. Moechten Sie Zusatzkategorien bearbeiten? Antwortoptionen: "keine", "alle" oder Kombinationen wie "1 3".\n1. Welche Fragen werden gestellt\n2. Reaktion auf Ihre Einwaende\n3. Verhalten in der Abschlussphase',
+                    OPTIONAL_CATEGORY_BUTTONS_TOKEN,
+                ),
                 stateJson: stringifyState(state),
                 stepKey: 'phase1_optional_selection',
                 status: 'phase1_running',
@@ -666,7 +708,10 @@ export async function continueProfilingTurn(profiling: Profiling, userInput: str
             state.phase1SecondaryType = ranked[1]
 
             return {
-                reply: `${buildPhase1ResultText(state.alias, ranked[0], ranked[1])}\n\nMoechten Sie jetzt mit Phase 2 starten? Antworten Sie mit "ja" oder "nein".`,
+                reply: withButtons(
+                    `${buildPhase1ResultText(state.alias, ranked[0], ranked[1])}\n\nMoechten Sie jetzt mit Phase 2 starten? Antworten Sie mit "ja" oder "nein".`,
+                    YES_NO_BUTTONS_TOKEN,
+                ),
                 stateJson: stringifyState(state),
                 stepKey: 'phase2_start_decision',
                 status: 'phase1_done_phase2_not_started',
@@ -692,7 +737,7 @@ export async function continueProfilingTurn(profiling: Profiling, userInput: str
         const normalized = input.toLowerCase()
         if (normalized !== 'ja' && normalized !== 'nein') {
             return {
-                reply: 'Bitte antworten Sie mit "ja" oder "nein".',
+                reply: withButtons('Bitte antworten Sie mit "ja" oder "nein".', YES_NO_BUTTONS_TOKEN),
                 stateJson: profiling.stateJson,
                 stepKey: 'phase2_start_decision',
                 status: 'phase1_done_phase2_not_started',
@@ -735,7 +780,7 @@ export async function continueProfilingTurn(profiling: Profiling, userInput: str
         const normalized = input.toLowerCase()
         if (normalized !== 'ja' && normalized !== 'nein') {
             return {
-                reply: 'Bitte antworten Sie mit "ja" oder "nein".',
+                reply: withButtons('Bitte antworten Sie mit "ja" oder "nein".', YES_NO_BUTTONS_TOKEN),
                 stateJson: profiling.stateJson,
                 stepKey: 'phase2_continue_decision',
                 status: 'phase2_running',
@@ -787,7 +832,7 @@ export async function continueProfilingTurn(profiling: Profiling, userInput: str
         const score = parseScoreInput(input, 0, 5)
         if (score === null) {
             return {
-                reply: 'Ungueltige Eingabe. Bitte bewerten Sie mit einem Wert von 0 bis 5.',
+                reply: withButtons('Ungueltige Eingabe. Bitte bewerten Sie mit einem Wert von 0 bis 5.', ZERO_TO_FIVE_BUTTONS_TOKEN),
                 stateJson: profiling.stateJson,
                 stepKey: 'phase2_statement',
                 status: 'phase2_running',
