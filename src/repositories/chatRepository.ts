@@ -29,6 +29,41 @@ function getMissingFlowScriptMessage(flowType: string): string {
     return `Deterministic flow script "${flowType}" was not found. AI mode resumed.`
 }
 
+async function persistAssistantReply(chatId: string, content: string, createdAt = Date.now()): Promise<void> {
+    const chat = await db.chats.get(chatId)
+    if (!chat) {
+        await db.messages.add(createAssistantMessage(chatId, content, createdAt))
+        return
+    }
+
+    const room = await db.rooms.get(chat.roomId)
+    const roomCustomAttributes = normalizeRoomCustomAttributes(room?.customAttributes)
+    const attributeResult = applyRoomAttributeDirectives(content, roomCustomAttributes)
+    const directive = parseRuleFlowDirective(attributeResult.cleanedText)
+    const contentForDisplay = directive ? directive.cleanedText : attributeResult.cleanedText
+
+    if (room && attributeResult.didUpdateAttributes) {
+        await db.rooms.update(room.id, { customAttributes: attributeResult.customAttributes })
+    }
+
+    const parts = splitAssistantResponse(contentForDisplay)
+    const preparedMessages: Message[] = []
+    parts.forEach((part, partIndex) => {
+        if (!part.trim()) return
+        preparedMessages.push({
+            id: partIndex === 0 ? crypto.randomUUID() : `${crypto.randomUUID()}_${partIndex}`,
+            chatId,
+            role: 'assistant',
+            content: part,
+            createdAt: createdAt + partIndex,
+        })
+    })
+
+    if (preparedMessages.length > 0) {
+        await db.messages.bulkAdd(preparedMessages)
+    }
+}
+
 function toFlowStepLabel(step: string): string {
     switch (step) {
         case 'ask_name':
@@ -148,7 +183,7 @@ export const chatRepository = {
             ? `Deterministic flow aborted: ${reason}`
             : 'Deterministic flow aborted.'
 
-        await db.messages.add(createAssistantMessage(chatId, assistantText))
+        await persistAssistantReply(chatId, assistantText)
     },
 
     async sendMessage(
@@ -191,7 +226,7 @@ export const chatRepository = {
                 updatedAt: Date.now(),
             })
 
-            await db.messages.add(createAssistantMessage(chat.id, handled.assistantReply))
+            await persistAssistantReply(chat.id, handled.assistantReply)
 
             if (handled.status === 'completed') {
                 await db.flowSessions.delete(chat.id)
@@ -277,7 +312,7 @@ export const chatRepository = {
             await db.flowSessions.put(flowSession)
 
             const initialPrompt = await flowHandler.getInitialPrompt(flowSession.flowType, flowSession)
-            await db.messages.add(createAssistantMessage(chat.id, initialPrompt, Date.now() + 1))
+            await persistAssistantReply(chat.id, initialPrompt, Date.now() + 1)
         }
     },
 }
